@@ -13,7 +13,7 @@ const products = [
 
 const links = [
   ['/cart', 'Cart'], ['/wishlist', 'Wishlist'], ['/checkout/information', 'Checkout'], ['/account', 'Account'],
-  ['/help', 'Help Center'], ['/faq', 'FAQ'], ['/contact', 'Contact'], ['/about', 'About'],
+  ['/shipping-policy', 'Shipping & returns'], ['/contact', 'Contact us'], ['/track-order', 'Order tracking'], ['/faq', 'FAQs'], ['/about', 'About'],
 ]
 
 export function PageShell({ children, checkout = false }: { children: React.ReactNode; checkout?: boolean }) {
