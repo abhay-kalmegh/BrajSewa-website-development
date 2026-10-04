@@ -1,2 +1,2 @@
-import { GenericPage } from '@/components/site-pages'
-export default function Page() { return <GenericPage eyebrow="Order tracking" title="Track your order."><div className="mt-8 max-w-md rounded-2xl bg-white p-6"><form className="flex flex-col gap-4"><input placeholder="Order number" className="rounded-xl border p-3" /><input placeholder="Email or mobile" className="rounded-xl border p-3" /><button className="rounded-full bg-[#d99a2b] p-3 font-bold text-white">Track Order</button></form></div></GenericPage> }
+import { TrackingPage } from '@/components/site-pages'
+export default function Page() { return <TrackingPage /> }

@@ -1,2 +1,2 @@
-import { GenericPage } from '@/components/site-pages'
-export default function Page() { return <GenericPage eyebrow="Support" title="Contact us"><div className="mt-8 max-w-2xl rounded-2xl bg-white p-6"><form className="grid gap-4 sm:grid-cols-2"><input placeholder="Name" className="rounded-xl border p-3" /><input placeholder="Email" className="rounded-xl border p-3" /><textarea placeholder="Message" className="rounded-xl border p-3 sm:col-span-2" rows={5} /><button className="rounded-full bg-[#d99a2b] p-3 font-bold text-white sm:col-span-2">Send Message</button></form></div></GenericPage> }
+import { ContactPage } from '@/components/site-pages'
+export default function Page() { return <ContactPage /> }

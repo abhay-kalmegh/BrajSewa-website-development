@@ -1,2 +1,2 @@
-import { PolicyPage } from '@/components/site-pages'
-export default function Page() { return <PolicyPage title="Shipping policy" /> }
+import { ShippingPage } from '@/components/site-pages'
+export default function Page() { return <ShippingPage /> }
