@@ -1,0 +1,2 @@
+import { GenericPage } from '@/components/site-pages'
+export default function Page() { return <GenericPage eyebrow="Your saved products" title="Wishlist"><div className="mt-8 rounded-2xl bg-white p-10 text-center"><p className="font-serif text-3xl">Your wishlist is empty.</p><a href="/#shop" className="mt-5 inline-flex rounded-full bg-[#d99a2b] px-5 py-3 text-sm font-bold text-white">Explore Products</a></div></GenericPage> }
