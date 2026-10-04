@@ -128,7 +128,14 @@ function ProductCard({ product, liked, onLike, onAdd }: { product: typeof produc
 }
 
 function FooterCol({ title, items }: { title: string; items: string[] }) {
-  return <div><h3 className="text-xs font-bold uppercase tracking-[0.2em] text-[#f5d693]">{title}</h3><ul className="mt-5 flex flex-col gap-3 text-sm text-white/55">{items.map((item) => <li key={item}><a href="#top" className="hover:text-white">{item}</a></li>)}</ul></div>
+  const routes: Record<string, string> = {
+    'Shipping & returns': '/shipping-policy',
+    'Contact us': '/contact',
+    'Order tracking': '/track-order',
+    FAQs: '/faq',
+  }
+
+  return <div><h3 className="text-xs font-bold uppercase tracking-[0.2em] text-[#f5d693]">{title}</h3><ul className="mt-5 flex flex-col gap-3 text-sm text-white/55">{items.map((item) => <li key={item}><a href={routes[item] ?? '#shop'} className="hover:text-white">{item}</a></li>)}</ul></div>
 }
 
 // Keep these imports in the client bundle tree-shakeable for the interaction affordance.
