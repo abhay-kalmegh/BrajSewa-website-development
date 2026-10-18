@@ -1,11 +1,11 @@
 from rest_framework import serializers
-from .models import Order, Product
+from .models import BuyerProfile, Order, Product, SellerProfile
 
 class ProductSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField()
     class Meta:
         model = Product
-        fields = ['id', 'name', 'slug', 'description', 'price']
+        fields = ['id', 'name', 'slug', 'description', 'price', 'inventory', 'active']
     def get_price(self, obj):
         return obj.price_paise / 100
 
@@ -34,3 +34,20 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = ['id', 'status', 'total', 'razorpay_order_id', 'created_at']
     def get_total(self, obj):
         return obj.total_paise / 100
+
+class RegisterSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(min_length=8, write_only=True)
+    firstName = serializers.CharField(max_length=80)
+    lastName = serializers.CharField(max_length=80, required=False, allow_blank=True)
+    role = serializers.ChoiceField(choices=['buyer', 'seller'], default='buyer')
+
+class ProfileSerializer(serializers.Serializer):
+    id = serializers.IntegerField(source='pk')
+    email = serializers.EmailField(source='email')
+    role = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+    def get_role(self, obj):
+        return 'seller' if hasattr(obj, 'seller_profile') else 'buyer'
+    def get_name(self, obj):
+        return obj.get_full_name() or obj.email

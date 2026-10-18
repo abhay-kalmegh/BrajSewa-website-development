@@ -37,3 +37,17 @@ export function getOrder(orderId: string) {
 export function login(payload: { email: string; password: string }) {
   return request<{ access: string; refresh: string }>('/api/v1/auth/token/', { method: 'POST', body: JSON.stringify(payload) })
 }
+
+export function register(payload: { email: string; password: string; firstName: string; lastName?: string; role?: 'buyer' | 'seller' }) {
+  return request<{ access: string; refresh: string; user: { id: number; email: string; role: string } }>('/api/v1/auth/register/', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export function getMyProfile(token: string) {
+  return request<{ id: number; email: string; role: 'buyer' | 'seller'; name: string }>('/api/v1/account/me/', { headers: { Authorization: `Bearer ${token}` } })
+}
+
+export function getSellerProducts(token: string) {
+  return request<ProductSummary[]>('/api/v1/seller/products/', { headers: { Authorization: `Bearer ${token}` } })
+}
+
+export type ProductSummary = { id: number; name: string; slug: string; description: string; price: number; inventory: number; active: boolean }

@@ -1,11 +1,28 @@
 from django.conf import settings
 from django.db import models
 
+class SellerProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='seller_profile', on_delete=models.CASCADE)
+    display_name = models.CharField(max_length=160)
+    business_name = models.CharField(max_length=180, blank=True)
+    approved = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class BuyerProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='buyer_profile', on_delete=models.CASCADE)
+    phone = models.CharField(max_length=24, blank=True)
+    address = models.TextField(blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)
+    postal_code = models.CharField(max_length=6, blank=True)
+
 class Product(models.Model):
+    seller = models.ForeignKey(SellerProfile, related_name='products', on_delete=models.PROTECT, null=True, blank=True)
     name = models.CharField(max_length=180)
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
     price_paise = models.PositiveIntegerField()
+    inventory = models.PositiveIntegerField(default=0)
     active = models.BooleanField(default=True)
 
 class Order(models.Model):
