@@ -1,2 +1,2 @@
-import { CheckoutPage } from '@/components/site-pages'
-export default function Page() { return <CheckoutPage step="review" /> }
+import { ReviewOrderPage } from '@/components/review-order-page'
+export default function Page() { return <ReviewOrderPage /> }
