@@ -215,5 +215,20 @@ class ImageHostSettingsTests(unittest.TestCase):
         self.assertEqual((code, out), (0, "['images.unsplash.com', 'cdn.brajsewa.com', 'media.example.org']"), err)
 
 
+
+class ApiExposureSettingsTests(unittest.TestCase):
+    def test_only_the_json_renderer_is_enabled(self):
+        code, out, err = load_settings(expr="s.REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES']")
+        self.assertEqual((code, out), (0, "['rest_framework.renderers.JSONRenderer']"), err)
+
+    def test_cors_allows_no_origin_by_default(self):
+        code, out, err = load_settings(drop=['CORS_ALLOWED_ORIGINS'], expr='s.CORS_ALLOWED_ORIGINS')
+        self.assertEqual((code, out), (0, '[]'), err)
+
+    def test_cors_origins_can_still_be_configured(self):
+        code, out, err = load_settings({'CORS_ALLOWED_ORIGINS': 'https://a.example, https://b.example'}, expr='s.CORS_ALLOWED_ORIGINS')
+        self.assertEqual((code, out), (0, "['https://a.example', 'https://b.example']"), err)
+
+
 if __name__ == '__main__':
     unittest.main()

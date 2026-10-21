@@ -97,6 +97,7 @@ SIMPLE_JWT = {
 # REST framework: secure by default, public endpoints opt in with AllowAny -------------------------
 API_NUM_PROXIES = os.getenv('API_NUM_PROXIES') or None  # number of reverse proxies in front of Django (see README)
 REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer'],   # no HTML "Browsable API" that maps the endpoints
     'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework_simplejwt.authentication.JWTAuthentication'],
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
     'DEFAULT_THROTTLE_CLASSES': ['shop.throttling.FailOpenScopedRateThrottle'],   # allows requests if the cache is down
@@ -123,7 +124,9 @@ else:
     CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
 
 # CORS / CSRF ---------------------------------------------------------------------------------
-CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS', 'http://localhost:3000')
+# The browser never calls Django directly (the Next.js server does), so no cross-origin access is needed by default.
+# An unset variable must mean "none", not a development origin quietly allowed in production.
+CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS')
 CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
 ADMIN_URL = os.getenv('DJANGO_ADMIN_PATH', 'admin/').strip('/') + '/'
 

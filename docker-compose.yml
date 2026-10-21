@@ -37,7 +37,7 @@ services:
       DJANGO_HTTPS_ONLY: ${DJANGO_HTTPS_ONLY:-true}
       DJANGO_ALLOW_INSECURE_HTTP: ${DJANGO_ALLOW_INSECURE_HTTP:-false}
       RAZORPAY_ALLOW_TEST_KEYS: ${RAZORPAY_ALLOW_TEST_KEYS:-false}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}      # empty: only the Next.js server calls Django
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
       API_NUM_PROXIES: ${API_NUM_PROXIES:-1}      # Next.js is the single proxy in front of Django
       REDIS_URL: redis://redis:6379/0

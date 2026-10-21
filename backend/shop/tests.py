@@ -603,3 +603,17 @@ class InputValidationTests(ShopTestCase):
         self.assertEqual(self.seller_post(slug='ok-3', details=['108 beads', 'Keep dry']).status_code, 201)
         for bad in ([{'a': 1}], 'not a list', ['x'] * 11, ['x' * 201], ['']):
             self.assertEqual(self.seller_post(slug='bad', details=bad).status_code, 400, repr(bad))
+
+
+class ApiExposureTests(TestCase):
+    BROWSER_ACCEPT = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+
+    def test_a_browser_gets_json_not_the_html_browsable_api(self):
+        r = self.client.get('/api/v1/products/', HTTP_ACCEPT=self.BROWSER_ACCEPT)
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r['Content-Type'].startswith('application/json'), r['Content-Type'])
+        self.assertNotIn(b'<html', r.content.lower())
+
+    def test_no_cross_origin_access_is_granted(self):
+        r = self.client.get('/api/v1/products/', HTTP_ORIGIN='https://evil.example')
+        self.assertNotIn('Access-Control-Allow-Origin', r)
