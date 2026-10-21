@@ -1,4 +1,4 @@
-# HomeShop2 Django backend
+# BrajSewa.com Django backend
 
 This service owns catalog data, customer accounts, orders, and Razorpay payment verification.
 

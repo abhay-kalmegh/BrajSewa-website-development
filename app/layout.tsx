@@ -4,17 +4,20 @@ import './globals.css'
 import { CartProvider } from '@/lib/cart'
 
 export const metadata: Metadata = {
-  title: 'HomeShop2 — Braj Seva',
-  description: 'Premium devotional seva essentials inspired by Braj and Vrindavan. Make Naam Jap a daily habit.',
+  title: 'BrajSewa.com — Seva, Bhakti, Life',
+  description: 'Discover devotional essentials for Shri Thakurji seva, pooja, bhakti, and everyday spiritual living.',
+  metadataBase: new URL('https://brajsewa.com'),
+  alternates: { canonical: '/' },
+  openGraph: { title: 'BrajSewa.com — Seva, Bhakti, Life', description: 'Discover devotional essentials for Shri Thakurji seva, pooja, bhakti, and everyday spiritual living.', url: 'https://brajsewa.com', siteName: 'BrajSewa.com', type: 'website' },
   generator: 'v0.app',
   icons: {
     icon: [
       {
-        url: '/icon-light-32x32.png',
+        url: '/brajsewa-logo.png',
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/icon-dark-32x32.png',
+        url: '/brajsewa-logo.png',
         media: '(prefers-color-scheme: dark)',
       },
       {
