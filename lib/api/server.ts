@@ -12,13 +12,14 @@ import { NextResponse } from 'next/server'
 import { clientIp } from '@/lib/api/client-ip'
 import { resolveSecureCookies } from '@/lib/api/cookie-policy'
 import { requestIdFor } from '@/lib/api/request-id'
+import { refreshMaxAgeSeconds } from '@/lib/api/session-lifetime'
 
 const API = (process.env.API_INTERNAL_URL ?? '').replace(/\/$/, '')
 
 export const ACCESS_COOKIE = 'bs_access'
 export const REFRESH_COOKIE = 'bs_refresh'
 const ACCESS_MAX_AGE = 15 * 60 // keep in step with SIMPLE_JWT ACCESS_TOKEN_LIFETIME
-const REFRESH_MAX_AGE = 7 * 24 * 60 * 60 // ... and REFRESH_TOKEN_LIFETIME
+// The refresh cookie's lifetime comes from AUTH_REFRESH_DAYS (default 3) and must match Django's JWT_REFRESH_DAYS.
 
 // Evaluated per call (not at import) so `next build` never trips on it, but a misconfigured production server
 // fails closed the first time it would hand out an insecure session cookie. See lib/api/cookie-policy.ts.
@@ -34,7 +35,7 @@ export async function setAuthCookies(tokens: { access: string; refresh?: string 
   const jar = await cookies()
   jar.set(ACCESS_COOKIE, tokens.access, { ...cookieBase(), path: '/', maxAge: ACCESS_MAX_AGE })
   // Scoped to /api so it is sent to the auth and proxy routes but never with page navigations.
-  if (tokens.refresh) jar.set(REFRESH_COOKIE, tokens.refresh, { ...cookieBase(), path: '/api', maxAge: REFRESH_MAX_AGE })
+  if (tokens.refresh) jar.set(REFRESH_COOKIE, tokens.refresh, { ...cookieBase(), path: '/api', maxAge: refreshMaxAgeSeconds(process.env) })
 }
 
 export async function clearAuthCookies() {

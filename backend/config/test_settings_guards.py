@@ -230,5 +230,26 @@ class ApiExposureSettingsTests(unittest.TestCase):
         self.assertEqual((code, out), (0, "['https://a.example', 'https://b.example']"), err)
 
 
+
+class RefreshLifetimeTests(unittest.TestCase):
+    def test_default_refresh_token_lifetime_is_three_days(self):
+        code, out, err = load_settings(expr="s.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].days")
+        self.assertEqual((code, out), (0, '3'), err)
+
+    def test_it_is_configurable(self):
+        code, out, err = load_settings({'JWT_REFRESH_DAYS': '14'}, expr="s.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].days")
+        self.assertEqual((code, out), (0, '14'), err)
+
+    def test_out_of_range_or_non_numeric_values_are_refused(self):
+        for bad in ('0', '31', '-1', 'abc', '1.5', ''):
+            code, _, err = load_settings({'JWT_REFRESH_DAYS': bad})
+            self.assertNotEqual(code, 0, bad)
+            self.assertIn('JWT_REFRESH_DAYS', err)
+
+    def test_access_tokens_remain_short_lived_and_rotation_policy_is_unchanged(self):
+        code, out, err = load_settings(expr="(s.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].seconds, s.SIMPLE_JWT['ROTATE_REFRESH_TOKENS'])")
+        self.assertEqual((code, out), (0, '(900, False)'), err)
+
+
 if __name__ == '__main__':
     unittest.main()

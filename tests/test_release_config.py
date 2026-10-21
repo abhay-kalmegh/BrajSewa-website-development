@@ -64,6 +64,12 @@ class ReleaseConfigTests(unittest.TestCase):
         self.assertIn('reconcile_payments', command)
         self.assertIn('|| true', command)          # a reported discrepancy must not stop the loop that expires orders
         self.assertIn('$$', command)               # compose requires `$$` for a literal `$`
+        self.assertIn('flushexpiredtokens', command)   # the JWT blacklist table needs a daily clean-up
+
+    def test_cookie_and_token_lifetimes_come_from_one_setting(self):
+        services = compose()
+        self.assertEqual(services['backend']['environment']['JWT_REFRESH_DAYS'], '${SESSION_REFRESH_DAYS:-3}')
+        self.assertEqual(services['frontend']['environment']['AUTH_REFRESH_DAYS'], '${SESSION_REFRESH_DAYS:-3}')
 
     def test_only_one_service_migrates(self):
         migrating = [n for n, s in compose().items() if 'migrate' in json.dumps(s.get('command', ''))]

@@ -31,6 +31,7 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY}
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY}      # separate from DJANGO_SECRET_KEY
       DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      JWT_REFRESH_DAYS: ${SESSION_REFRESH_DAYS:-3}      # keep equal to the frontend's AUTH_REFRESH_DAYS
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
       # Secure by default. Plain-HTTP local runs get their opt-outs from docker-compose.override.yml, which is
       # merged automatically by `docker compose up` on a dev machine and must NOT be deployed.
@@ -85,10 +86,11 @@ services:
       context: ./backend
     restart: unless-stopped
     environment: *backend_env
-    # Every 5 minutes release stock held by unpaid orders; every hour (12th pass) reconcile captured payments against orders.
+    # Every 5 minutes release stock held by unpaid orders; every hour (12th pass) reconcile captured payments against orders;
+    # every day (288th pass) delete expired entries from the JWT blacklist table, which otherwise grows forever.
     # `|| true` keeps the loop alive when reconcile exits non-zero to flag a discrepancy (it logs "MANUAL REVIEW" lines).
     # `$$` is compose's escape for a literal `$`.
-    command: ["sh", "-c", "i=0; while true; do python manage.py expire_orders --minutes 30; i=$$((i+1)); if [ $$((i % 12)) -eq 0 ]; then python manage.py reconcile_payments || true; fi; sleep 300; done"]
+    command: ["sh", "-c", "i=0; while true; do python manage.py expire_orders --minutes 30; i=$$((i+1)); if [ $$((i % 12)) -eq 0 ]; then python manage.py reconcile_payments || true; fi; if [ $$((i % 288)) -eq 0 ]; then python manage.py flushexpiredtokens || true; fi; sleep 300; done"]
     healthcheck:
       disable: true   # this container does not serve HTTP
     depends_on:
@@ -109,6 +111,7 @@ services:
       # Server-side only. The browser never talks to Django directly.
       API_INTERNAL_URL: http://backend:8000
       TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
+      AUTH_REFRESH_DAYS: ${SESSION_REFRESH_DAYS:-3}      # keep equal to the backend's JWT_REFRESH_DAYS
       # Auth cookies carry the Secure flag by default. The production server refuses to start handing out insecure
       # ones unless ALLOW_INSECURE_COOKIES=true (set only by the dev override).
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}

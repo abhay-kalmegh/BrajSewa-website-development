@@ -81,12 +81,21 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
+# A stolen refresh token works until it expires and cannot be detected (rotation is off, see below), so keep it short.
+# The Next.js cookie lifetime must match: both are fed from SESSION_REFRESH_DAYS in docker-compose.
+try:
+    JWT_REFRESH_DAYS = int(os.getenv('JWT_REFRESH_DAYS', '3'))
+except ValueError:
+    raise ImproperlyConfigured('JWT_REFRESH_DAYS must be a whole number of days.')
+if not 1 <= JWT_REFRESH_DAYS <= 30:
+    raise ImproperlyConfigured('JWT_REFRESH_DAYS must be between 1 and 30.')
+
 SIMPLE_JWT = {
     'SIGNING_KEY': JWT_SIGNING_KEY,   # HS256; separate from SECRET_KEY
     'ISSUER': 'brajsewa-api',
     'AUDIENCE': 'brajsewa-web',
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=JWT_REFRESH_DAYS),
     # Rotation is off on purpose: the Next.js proxy can refresh from several parallel requests,
     # and rotation + blacklisting would then log users out spuriously. Logout blacklists the
     # refresh token explicitly (auth/token/blacklist/).
