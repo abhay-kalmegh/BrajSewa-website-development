@@ -5,10 +5,11 @@ from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
 
+from django.conf import settings as django_settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.management import call_command
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -420,3 +421,27 @@ class SeedCatalogTests(ShopTestCase):
         listed = [p['slug'] for p in self.client.get('/api/v1/products/').data]
         self.assertNotIn('seva-box-packing', listed)
         self.assertIn('tulsi-japa-mala', listed)
+
+
+class HealthCheckTests(TestCase):
+    """Probes must work with the target's IP as Host, which Django's host validation would otherwise reject."""
+
+    def test_health_middleware_is_first(self):
+        self.assertEqual(django_settings.MIDDLEWARE[0], 'config.health.HealthCheckMiddleware')
+
+    def test_liveness_accepts_a_pod_ip_host(self):
+        r = self.client.get('/healthz/', HTTP_HOST='10.20.3.4')
+        self.assertEqual((r.status_code, r.content), (200, b'ok'))
+
+    def test_readiness_ok_when_database_answers(self):
+        r = self.client.get('/readyz/', HTTP_HOST='10.20.3.4')
+        self.assertEqual((r.status_code, r.content), (200, b'ok'))
+
+    def test_readiness_is_503_when_database_is_down_but_liveness_stays_200(self):
+        with patch('config.health.connection') as conn:
+            conn.cursor.side_effect = Exception('connection refused')
+            self.assertEqual(self.client.get('/readyz/', HTTP_HOST='10.20.3.4').status_code, 503)
+            self.assertEqual(self.client.get('/healthz/', HTTP_HOST='10.20.3.4').status_code, 200)
+
+    def test_host_validation_is_still_enforced_elsewhere(self):
+        self.assertEqual(self.client.get('/api/v1/products/', HTTP_HOST='evil.example').status_code, 400)

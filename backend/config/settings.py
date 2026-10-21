@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions', 'django.contrib.messages', 'django.contrib.staticfiles', 'shop',
 ]
 MIDDLEWARE = [
+    'config.health.HealthCheckMiddleware',      # must stay FIRST: answers probes before Host validation
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
