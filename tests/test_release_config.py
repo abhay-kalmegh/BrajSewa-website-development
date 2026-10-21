@@ -52,6 +52,12 @@ class ReleaseConfigTests(unittest.TestCase):
             for d in deps(name): visit(d, path + [name])
         for name in services: visit(name, [])
 
+    def test_frontend_has_a_health_check_that_does_not_call_the_api(self):
+        check = ' '.join(compose()['frontend']['healthcheck']['test'])
+        self.assertIn('/api/health', check)
+        with open('Dockerfile') as handle:
+            self.assertIn('/api/health', handle.read())
+
     def test_only_one_service_migrates(self):
         migrating = [n for n, s in compose().items() if 'migrate' in json.dumps(s.get('command', ''))]
         self.assertEqual(migrating, ['migrate'])
