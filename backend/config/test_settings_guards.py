@@ -8,14 +8,17 @@ import unittest
 
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Assembled at runtime so the repository's secret scan does not flag a realistic-looking fixture.
+LIVE_KEY = 'rzp_' + 'live_' + 'ABCDEF123456'
+TEST_KEY = 'rzp_' + 'test_' + 'ABCDEF123456'
+
 # A production-shaped environment that passes every guard. Individual tests change one thing.
 GOOD_ENV = {
     'DJANGO_SECRET_KEY': 'q8Zt2vKx9PbNf4LwRc7YhJm3SdAe6UgXo1VnTiBk5CzQpWy0DrEaHuFlMj8GsOtIc',
     'JWT_SIGNING_KEY': 'Hk3Vb9WnPz5QdLx7RtYc2MfGj8SaEu4NoXi1BwKe6ZpTqUr0DlCvAmFgJhSyOtIdN',
     'DJANGO_DEBUG': 'false', 'DJANGO_HTTPS_ONLY': 'true', 'API_NUM_PROXIES': '1',
     'POSTGRES_DB': 'brajsewa', 'POSTGRES_USER': 'app', 'POSTGRES_PASSWORD': 'x', 'POSTGRES_HOST': 'db',
-    'RAZORPAY_KEY_ID': 'rzp_' + 'live_' + 'ABCDEF123456',   # assembled at runtime so the repo-wide secret scan does not flag a fixture
-    'RAZORPAY_KEY_SECRET': 's', 'RAZORPAY_WEBHOOK_SECRET': 'w',
+    'RAZORPAY_KEY_ID': LIVE_KEY, 'RAZORPAY_KEY_SECRET': 's', 'RAZORPAY_WEBHOOK_SECRET': 'w',
 }
 
 
@@ -47,9 +50,81 @@ class ProxyHopTests(unittest.TestCase):
         self.assertIn('API_NUM_PROXIES is not set', err)
 
     def test_unset_num_proxies_in_debug_is_quiet(self):
-        code, _, err = load_settings({'DJANGO_DEBUG': 'true', 'DJANGO_HTTPS_ONLY': 'false'}, drop=['API_NUM_PROXIES'])
+        code, _, err = load_settings({'DJANGO_DEBUG': 'true', 'DJANGO_HTTPS_ONLY': 'false'}, drop=['API_NUM_PROXIES', 'RAZORPAY_KEY_ID'])
         self.assertEqual(code, 0, err)
         self.assertNotIn('API_NUM_PROXIES', err)
+
+
+
+class SecretKeyTests(unittest.TestCase):
+    def assertRefused(self, overrides=None, drop=(), message=''):
+        code, _, err = load_settings(overrides, drop)
+        self.assertNotEqual(code, 0, 'settings should have refused to load')
+        self.assertIn('ImproperlyConfigured', err)
+        if message:
+            self.assertIn(message, err)
+
+    def test_short_secret_key_is_refused_in_production(self):
+        self.assertRefused({'DJANGO_SECRET_KEY': 'dev'}, message='DJANGO_SECRET_KEY is too weak')
+
+    def test_long_but_repetitive_secret_key_is_refused(self):
+        self.assertRefused({'DJANGO_SECRET_KEY': 'a' * 80}, message='too weak')
+
+    def test_weak_secret_key_is_fine_in_debug(self):
+        code, _, err = load_settings({'DJANGO_SECRET_KEY': 'dev', 'DJANGO_DEBUG': 'true', 'DJANGO_HTTPS_ONLY': 'false'}, drop=['JWT_SIGNING_KEY', 'RAZORPAY_KEY_ID'])
+        self.assertEqual(code, 0, err)
+
+    def test_jwt_key_is_required_in_production(self):
+        self.assertRefused(drop=['JWT_SIGNING_KEY'], message='JWT_SIGNING_KEY is required')
+
+    def test_jwt_key_must_differ_from_secret_key(self):
+        self.assertRefused({'JWT_SIGNING_KEY': GOOD_ENV['DJANGO_SECRET_KEY']}, message='must differ')
+
+    def test_weak_jwt_key_is_refused(self):
+        self.assertRefused({'JWT_SIGNING_KEY': 'short'}, message='JWT_SIGNING_KEY is too weak')
+
+    def test_jwt_settings_use_the_dedicated_key_issuer_and_audience(self):
+        code, out, err = load_settings(expr="bool(s.SIMPLE_JWT['SIGNING_KEY'] == s.os.environ['JWT_SIGNING_KEY'] and s.SIMPLE_JWT['ISSUER'] and s.SIMPLE_JWT['AUDIENCE'] and s.SIMPLE_JWT['SIGNING_KEY'] != s.SECRET_KEY)")
+        self.assertEqual((code, out), (0, 'True'), err)
+
+
+class TransportTests(unittest.TestCase):
+    def test_production_without_https_enforcement_is_refused(self):
+        code, _, err = load_settings({'DJANGO_HTTPS_ONLY': 'false'})
+        self.assertNotEqual(code, 0)
+        self.assertIn('Refusing to start in production without HTTPS', err)
+
+    def test_explicit_opt_out_is_allowed_for_local_runs(self):
+        code, _, err = load_settings({'DJANGO_HTTPS_ONLY': 'false', 'DJANGO_ALLOW_INSECURE_HTTP': 'true'})
+        self.assertEqual(code, 0, err)
+
+    def test_https_is_on_by_default_in_production(self):
+        code, out, err = load_settings(drop=['DJANGO_HTTPS_ONLY'], expr='s.HTTPS_ONLY and s.SECURE_SSL_REDIRECT')
+        self.assertEqual((code, out), (0, 'True'), err)
+
+
+class RazorpayKeyModeTests(unittest.TestCase):
+    def test_live_key_in_production_is_fine(self):
+        code, _, err = load_settings()
+        self.assertEqual(code, 0, err)
+
+    def test_test_key_in_production_is_refused(self):
+        code, _, err = load_settings({'RAZORPAY_KEY_ID': TEST_KEY})
+        self.assertNotEqual(code, 0)
+        self.assertIn('TEST key', err)
+
+    def test_test_key_allowed_for_staging_with_the_explicit_flag(self):
+        code, _, err = load_settings({'RAZORPAY_KEY_ID': TEST_KEY, 'RAZORPAY_ALLOW_TEST_KEYS': 'true'})
+        self.assertEqual(code, 0, err)
+
+    def test_live_key_with_debug_is_refused(self):
+        code, _, err = load_settings({'DJANGO_DEBUG': 'true', 'DJANGO_HTTPS_ONLY': 'false'})
+        self.assertNotEqual(code, 0)
+        self.assertIn('LIVE key', err)
+
+    def test_no_razorpay_key_is_allowed(self):
+        code, _, err = load_settings(drop=['RAZORPAY_KEY_ID'])   # CI and one-off tasks run without payment keys
+        self.assertEqual(code, 0, err)
 
 
 if __name__ == '__main__':

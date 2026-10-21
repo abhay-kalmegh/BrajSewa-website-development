@@ -3,6 +3,8 @@ import warnings
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 
 def env_bool(name, default):
     value = os.getenv(name)
@@ -16,6 +18,19 @@ def env_list(name, default=''):
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
 DEBUG = env_bool('DJANGO_DEBUG', False)
+
+# Production refuses to start with weak or shared signing material. Generate keys with:
+#   python -c "import secrets; print(secrets.token_urlsafe(64))"
+JWT_SIGNING_KEY = os.environ.get('JWT_SIGNING_KEY') or (SECRET_KEY if DEBUG else None)
+if not DEBUG:
+    if len(SECRET_KEY) < 50 or len(set(SECRET_KEY)) < 20:
+        raise ImproperlyConfigured('DJANGO_SECRET_KEY is too weak: use at least 50 characters with real variety.')
+    if not JWT_SIGNING_KEY:
+        raise ImproperlyConfigured('JWT_SIGNING_KEY is required in production (a separate key, not DJANGO_SECRET_KEY).')
+    if JWT_SIGNING_KEY == SECRET_KEY:
+        raise ImproperlyConfigured('JWT_SIGNING_KEY must differ from DJANGO_SECRET_KEY, so one leaked key does not expose both.')
+    if len(JWT_SIGNING_KEY) < 50 or len(set(JWT_SIGNING_KEY)) < 20:
+        raise ImproperlyConfigured('JWT_SIGNING_KEY is too weak: use at least 50 characters with real variety.')
 ALLOWED_HOSTS = env_list('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1')
 
 INSTALLED_APPS = [
@@ -52,6 +67,9 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 SIMPLE_JWT = {
+    'SIGNING_KEY': JWT_SIGNING_KEY,   # HS256; separate from SECRET_KEY
+    'ISSUER': 'brajsewa-api',
+    'AUDIENCE': 'brajsewa-web',
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     # Rotation is off on purpose: the Next.js proxy can refresh from several parallel requests,
@@ -96,6 +114,9 @@ ADMIN_URL = os.getenv('DJANGO_ADMIN_PATH', 'admin/').strip('/') + '/'
 
 # Transport security. Set DJANGO_HTTPS_ONLY=false only for local Docker/dev over plain HTTP. -------
 HTTPS_ONLY = env_bool('DJANGO_HTTPS_ONLY', not DEBUG)
+if not DEBUG and not HTTPS_ONLY and not env_bool('DJANGO_ALLOW_INSECURE_HTTP', False):
+    raise ImproperlyConfigured('Refusing to start in production without HTTPS enforcement. Set DJANGO_HTTPS_ONLY=true '
+                               '(or, for a local plain-HTTP run only, DJANGO_ALLOW_INSECURE_HTTP=true).')
 if HTTPS_ONLY:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
@@ -125,6 +146,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
 RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET', '')
+
+# A test key in production "sells" without taking money; a live key in development can charge real cards.
+if not DEBUG and RAZORPAY_KEY_ID.startswith('rzp_test_') and not env_bool('RAZORPAY_ALLOW_TEST_KEYS', False):
+    raise ImproperlyConfigured('A Razorpay TEST key is configured in a non-debug environment. Use live keys in production, '
+                               'or set RAZORPAY_ALLOW_TEST_KEYS=true for staging.')
+if DEBUG and RAZORPAY_KEY_ID.startswith('rzp_live_'):
+    raise ImproperlyConfigured('A Razorpay LIVE key is configured with DJANGO_DEBUG=true. Use test keys in development.')
 
 LOGGING = {
     'version': 1, 'disable_existing_loggers': False,

@@ -45,8 +45,11 @@ jobs:
       run:
         working-directory: backend
     env:
-      DJANGO_SECRET_KEY: ci-only-secret
+      DJANGO_SECRET_KEY: ci-only-not-a-real-secret-0123456789-abcdefghij-klmnopqrst
+      JWT_SIGNING_KEY: ci-only-another-not-real-key-9876543210-zyxwvutsrq-ponmlkjihg
       DJANGO_HTTPS_ONLY: 'false'
+      DJANGO_ALLOW_INSECURE_HTTP: 'true'     # CI talks plain HTTP to its test client
+      RAZORPAY_ALLOW_TEST_KEYS: 'true'
       POSTGRES_DB: test
       POSTGRES_USER: test
       POSTGRES_PASSWORD: test

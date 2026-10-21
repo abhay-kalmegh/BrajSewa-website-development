@@ -10,6 +10,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { clientIp } from '@/lib/api/client-ip'
+import { resolveSecureCookies } from '@/lib/api/cookie-policy'
 
 const API = (process.env.API_INTERNAL_URL ?? '').replace(/\/$/, '')
 
@@ -18,9 +19,9 @@ export const REFRESH_COOKIE = 'bs_refresh'
 const ACCESS_MAX_AGE = 15 * 60 // keep in step with SIMPLE_JWT ACCESS_TOKEN_LIFETIME
 const REFRESH_MAX_AGE = 7 * 24 * 60 * 60 // ... and REFRESH_TOKEN_LIFETIME
 
-// Secure cookies need HTTPS. Set AUTH_COOKIE_SECURE=false only for local plain-HTTP runs.
-const SECURE = (process.env.AUTH_COOKIE_SECURE ?? String(process.env.NODE_ENV === 'production')) === 'true'
-const base = { httpOnly: true, secure: SECURE, sameSite: 'lax' as const }
+// Evaluated per call (not at import) so `next build` never trips on it, but a misconfigured production server
+// fails closed the first time it would hand out an insecure session cookie. See lib/api/cookie-policy.ts.
+const cookieBase = () => ({ httpOnly: true, secure: resolveSecureCookies(process.env), sameSite: 'lax' as const })
 
 export function jsonError(detail: string, status: number, extra: Record<string, unknown> = {}) {
   return NextResponse.json({ detail, ...extra }, { status, headers: { 'Cache-Control': 'no-store' } })
@@ -30,15 +31,15 @@ export function jsonError(detail: string, status: number, extra: Record<string, 
 
 export async function setAuthCookies(tokens: { access: string; refresh?: string }) {
   const jar = await cookies()
-  jar.set(ACCESS_COOKIE, tokens.access, { ...base, path: '/', maxAge: ACCESS_MAX_AGE })
+  jar.set(ACCESS_COOKIE, tokens.access, { ...cookieBase(), path: '/', maxAge: ACCESS_MAX_AGE })
   // Scoped to /api so it is sent to the auth and proxy routes but never with page navigations.
-  if (tokens.refresh) jar.set(REFRESH_COOKIE, tokens.refresh, { ...base, path: '/api', maxAge: REFRESH_MAX_AGE })
+  if (tokens.refresh) jar.set(REFRESH_COOKIE, tokens.refresh, { ...cookieBase(), path: '/api', maxAge: REFRESH_MAX_AGE })
 }
 
 export async function clearAuthCookies() {
   const jar = await cookies()
-  jar.set(ACCESS_COOKIE, '', { ...base, path: '/', maxAge: 0 })
-  jar.set(REFRESH_COOKIE, '', { ...base, path: '/api', maxAge: 0 })
+  jar.set(ACCESS_COOKIE, '', { ...cookieBase(), path: '/', maxAge: 0 })
+  jar.set(REFRESH_COOKIE, '', { ...cookieBase(), path: '/api', maxAge: 0 })
 }
 
 export async function getRefreshToken() {

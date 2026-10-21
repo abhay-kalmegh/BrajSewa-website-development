@@ -38,7 +38,8 @@ class RepoHygiene(unittest.TestCase):
         hits = []
         for f in git('ls-files').stdout.split():
             try:
-                text = open(f, encoding='utf-8').read()
+                with open(f, encoding='utf-8') as handle:
+                    text = handle.read()
             except (UnicodeDecodeError, FileNotFoundError, IsADirectoryError):
                 continue
             hits += [f'{f}: {p.pattern}' for p in SECRET_PATTERNS if p.search(text)]

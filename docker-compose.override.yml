@@ -1,0 +1,15 @@
+# DEVELOPMENT ONLY. `docker compose up` merges this file automatically.
+# For a server, deploy with the base file only:   docker compose -f docker-compose.yml up -d
+# Everything here weakens a production safeguard so the stack works over plain http://localhost.
+services:
+  backend:
+    environment: &dev_backend
+      DJANGO_HTTPS_ONLY: "false"
+      DJANGO_ALLOW_INSECURE_HTTP: "true"
+      RAZORPAY_ALLOW_TEST_KEYS: "true"
+  scheduler:
+    environment: *dev_backend
+  frontend:
+    environment:
+      AUTH_COOKIE_SECURE: "false"
+      ALLOW_INSECURE_COOKIES: "true"
