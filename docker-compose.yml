@@ -1,3 +1,12 @@
+# Shared container hardening (a compose "extension field"): no Linux capabilities, no privilege escalation, a read-only
+# root filesystem (writable scratch space is mounted as tmpfs per service), and a cap on runaway process counts.
+# Not verified by running it here: after `docker compose up`, check every service reaches "healthy" (see the commit message).
+x-hardening: &hardening
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  read_only: true
+  pids_limit: 200
+
 services:
   db:
     image: postgres:16-alpine
@@ -14,19 +23,32 @@ services:
       timeout: 5s
       retries: 10
 
+  # Holds only rate-limit counters. Now requires a password (any container on the network could otherwise read it or
+  # flush the counters, switching rate limiting off), keeps nothing on disk, and runs as the unprivileged `redis` user
+  # (so the image's start-up script has no need for the chown/setuid capabilities we drop).
   redis:
+    <<: *hardening
     image: redis:7-alpine
     restart: unless-stopped
+    user: redis
+    mem_limit: 128m
+    tmpfs: [/data]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly no --save ''"]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 10
 
   backend:
+    <<: *hardening
     build:
       context: ./backend
     restart: unless-stopped
+    mem_limit: 512m
+    tmpfs: [/tmp]
     environment: &backend_env
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY}
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY}      # separate from DJANGO_SECRET_KEY
@@ -41,7 +63,7 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}      # empty: only the Next.js server calls Django
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
       API_NUM_PROXIES: ${API_NUM_PROXIES:-1}      # Next.js is the single proxy in front of Django
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@redis:6379/0   # use a URL-safe password: openssl rand -hex 24
       POSTGRES_DB: ${POSTGRES_DB:-brajsewa}
       POSTGRES_USER: ${POSTGRES_USER:-brajsewa}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
@@ -64,9 +86,12 @@ services:
   # One-shot release step: apply database migrations once, then exit. Migrations must be backward compatible with the
   # code that is still running during a rolling deploy (expand first, contract in a later release).
   migrate:
+    <<: *hardening
     build:
       context: ./backend
     restart: "no"
+    mem_limit: 512m
+    tmpfs: [/tmp]
     environment:
       <<: *backend_env
       # Migrations run as the schema OWNER (DDL); the web process uses the lower-privileged app role.
@@ -82,10 +107,15 @@ services:
 
   # Releases stock held by unpaid orders (see shop/management/commands/expire_orders.py).
   scheduler:
+    <<: *hardening
     build:
       context: ./backend
     restart: unless-stopped
-    environment: *backend_env
+    mem_limit: 384m
+    tmpfs: [/tmp]
+    environment:
+      <<: *backend_env
+      RAZORPAY_WEBHOOK_SECRET: ""      # least privilege: the scheduler calls Razorpay's API but never receives webhooks
     # Every 5 minutes release stock held by unpaid orders; every hour (12th pass) reconcile captured payments against orders;
     # every day (288th pass) delete expired entries from the JWT blacklist table, which otherwise grows forever.
     # `|| true` keeps the loop alive when reconcile exits non-zero to flag a discrepancy (it logs "MANUAL REVIEW" lines).
@@ -98,6 +128,9 @@ services:
         condition: service_healthy
 
   frontend:
+    <<: *hardening
+    mem_limit: 768m
+    tmpfs: [/tmp, /app/.next/cache]      # Next.js image-optimizer cache
     build:
       context: .
       args:      # baked in at build time; changing them needs `docker compose build frontend`
@@ -127,7 +160,9 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "3000:3000"
+      # Loopback by default: put a TLS reverse proxy in front (see ARCHITECTURE.md). Set FRONTEND_BIND=0.0.0.0 only for a
+      # deliberate local-network demo; plain HTTP must not face the internet.
+      - "${FRONTEND_BIND:-127.0.0.1}:3000:3000"
 
 volumes:
   postgres_data:
