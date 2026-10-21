@@ -5,6 +5,8 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+from config.logging_utils import logging_config
+
 
 def env_bool(name, default):
     value = os.getenv(name)
@@ -40,6 +42,7 @@ INSTALLED_APPS = [
 ]
 MIDDLEWARE = [
     'config.health.HealthCheckMiddleware',      # must stay FIRST: answers probes before Host validation
+    'config.logging_utils.RequestIdMiddleware',  # every later log line carries the request id
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -164,8 +167,4 @@ if not DEBUG and RAZORPAY_KEY_ID.startswith('rzp_test_') and not env_bool('RAZOR
 if DEBUG and RAZORPAY_KEY_ID.startswith('rzp_live_'):
     raise ImproperlyConfigured('A Razorpay LIVE key is configured with DJANGO_DEBUG=true. Use test keys in development.')
 
-LOGGING = {
-    'version': 1, 'disable_existing_loggers': False,
-    'handlers': {'console': {'class': 'logging.StreamHandler'}},
-    'root': {'handlers': ['console'], 'level': os.getenv('LOG_LEVEL', 'INFO')},
-}
+LOGGING = logging_config(os.getenv('LOG_LEVEL', 'INFO'))   # JSON lines with a request id, see config/logging_utils.py

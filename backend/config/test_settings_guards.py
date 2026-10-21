@@ -160,5 +160,24 @@ class ThrottleSettingsTests(unittest.TestCase):
         self.assertEqual((code, out), (0, "['shop.throttling.FailOpenScopedRateThrottle']"), err)
 
 
+
+class LoggingSettingsTests(unittest.TestCase):
+    def test_logging_is_json_with_a_request_id(self):
+        code, out, err = load_settings(expr="s.LOGGING['formatters']['json']['()'] + '|' + ','.join(s.LOGGING['handlers']['console']['filters'])")
+        self.assertEqual((code, out), (0, 'pythonjsonlogger.json.JsonFormatter|request_id'), err)
+
+    def test_log_level_is_configurable(self):
+        code, out, err = load_settings({'LOG_LEVEL': 'WARNING'}, expr="s.LOGGING['root']['level']")
+        self.assertEqual((code, out), (0, 'WARNING'), err)
+
+    def test_request_id_middleware_follows_the_health_middleware(self):
+        code, out, err = load_settings(expr='s.MIDDLEWARE[:2]')
+        self.assertEqual((code, out), (0, "['config.health.HealthCheckMiddleware', 'config.logging_utils.RequestIdMiddleware']"), err)
+
+    def test_json_logger_is_a_declared_dependency(self):
+        with open(os.path.join(BACKEND, 'requirements.txt')) as handle:
+            self.assertIn('python-json-logger', handle.read())
+
+
 if __name__ == '__main__':
     unittest.main()

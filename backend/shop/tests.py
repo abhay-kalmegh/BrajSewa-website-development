@@ -504,3 +504,19 @@ class RateLimitFailsOpenTests(ShopTestCase):
     def test_limits_are_still_enforced_when_the_cache_works(self):
         codes = [self.client.post('/api/v1/auth/token/', {'username': 'a@b.com', 'password': 'wrong'}, format='json').status_code for _ in range(9)]
         self.assertEqual(codes[8], 429)
+
+
+class RequestIdTests(TestCase):
+    def test_a_supplied_request_id_is_echoed(self):
+        r = self.client.get('/api/v1/products/', HTTP_X_REQUEST_ID='abc-123')
+        self.assertEqual(r['X-Request-ID'], 'abc-123')
+
+    def test_a_missing_request_id_is_generated(self):
+        self.assertRegex(self.client.get('/api/v1/products/')['X-Request-ID'], r'^[0-9a-f]{32}$')
+
+    def test_a_hostile_request_id_is_replaced(self):
+        r = self.client.get('/api/v1/products/', HTTP_X_REQUEST_ID='x INFO forged line')
+        self.assertRegex(r['X-Request-ID'], r'^[0-9a-f]{32}$')
+
+    def test_middleware_order_puts_health_then_request_id_first(self):
+        self.assertEqual(django_settings.MIDDLEWARE[:2], ['config.health.HealthCheckMiddleware', 'config.logging_utils.RequestIdMiddleware'])

@@ -11,6 +11,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { clientIp } from '@/lib/api/client-ip'
 import { resolveSecureCookies } from '@/lib/api/cookie-policy'
+import { requestIdFor } from '@/lib/api/request-id'
 
 const API = (process.env.API_INTERNAL_URL ?? '').replace(/\/$/, '')
 
@@ -88,7 +89,7 @@ const TRUSTED_PROXY_HOPS = Number(process.env.TRUSTED_PROXY_HOPS ?? '1')
  * rate-limit bucket. We send one address, taken from the hops our own infrastructure appended.
  */
 function forwardedHeaders(req?: Request): Record<string, string> {
-  const headers: Record<string, string> = {}
+  const headers: Record<string, string> = { 'X-Request-ID': requestIdFor(req) }
   const ip = clientIp(req?.headers.get('x-forwarded-for'), TRUSTED_PROXY_HOPS)
   if (ip) headers['X-Forwarded-For'] = ip
   // Django enforces HTTPS and trusts this header, but this hop is plain HTTP on a private network. Without it Django

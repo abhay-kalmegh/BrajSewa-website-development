@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { requestIdFor } from '@/lib/api/request-id'
 import { authedFetch, djangoFetch, guardMutation, jsonError } from '@/lib/api/server'
 
 /**
@@ -48,6 +49,7 @@ async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }
     headers: {
       'Content-Type': upstream.headers.get('content-type') ?? 'application/json',
       'Cache-Control': 'no-store',
+      'X-Request-ID': requestIdFor(req),   // quote this id in a support request: it finds the Next.js and Django logs
     },
   })
 }
