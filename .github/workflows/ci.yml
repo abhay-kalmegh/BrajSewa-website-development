@@ -11,7 +11,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0                 # scan the whole history, not just the tip
-      - run: python3 -m unittest tests.test_repo_hygiene
+      - run: pip install pyyaml
+      - run: python3 -m unittest tests.test_repo_hygiene tests.test_release_config
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

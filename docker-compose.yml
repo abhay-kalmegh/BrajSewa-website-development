@@ -54,8 +54,24 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully   # schema is up to date before any web process starts
     ports:
       - "127.0.0.1:8000:8000"   # loopback only; remove entirely once a reverse proxy fronts the stack
+
+  # One-shot release step: apply database migrations once, then exit. Migrations must be backward compatible with the
+  # code that is still running during a rolling deploy (expand first, contract in a later release).
+  migrate:
+    build:
+      context: ./backend
+    restart: "no"
+    environment: *backend_env
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    healthcheck:
+      disable: true   # not a server
+    depends_on:
+      db:
+        condition: service_healthy
 
   # Releases stock held by unpaid orders (see shop/management/commands/expire_orders.py).
   scheduler:
