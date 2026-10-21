@@ -20,6 +20,7 @@ from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairVi
 
 from . import cart as cart_logic
 from .models import BuyerProfile, Order, OrderLine, Product, SellerProfile
+from .failopen import FailOpenMixin
 from .inputs import mapping_or_empty
 from .pricing import shipping_for
 from .serializers import (CartLinesSerializer, CreateOrderSerializer, OrderSerializer, ProductSerializer,
@@ -37,7 +38,7 @@ class Conflict(APIException):
 
 # --------------------------------------------------------------------------- auth
 
-class LoginEmailThrottle(SimpleRateThrottle):
+class LoginEmailThrottle(FailOpenMixin, SimpleRateThrottle):
     """Limit login attempts per target account, independent of the caller's IP.
 
     The per-IP 'auth' scope alone is not enough: attackers rotate IPs, and behind the

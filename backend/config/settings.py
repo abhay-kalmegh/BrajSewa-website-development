@@ -94,7 +94,7 @@ API_NUM_PROXIES = os.getenv('API_NUM_PROXIES') or None  # number of reverse prox
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework_simplejwt.authentication.JWTAuthentication'],
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
-    'DEFAULT_THROTTLE_CLASSES': ['rest_framework.throttling.ScopedRateThrottle'],
+    'DEFAULT_THROTTLE_CLASSES': ['shop.throttling.FailOpenScopedRateThrottle'],   # allows requests if the cache is down
     'DEFAULT_THROTTLE_RATES': {
         'auth': '20/min',          # per IP: login, register, refresh, logout
         'login_email': '8/min',    # per target account, regardless of IP

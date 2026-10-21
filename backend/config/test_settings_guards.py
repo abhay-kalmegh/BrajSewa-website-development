@@ -153,5 +153,12 @@ class DatabaseSettingsTests(unittest.TestCase):
             self.assertIn('database traffic may be unencrypted', err, mode)
 
 
+
+class ThrottleSettingsTests(unittest.TestCase):
+    def test_default_throttle_class_fails_open(self):
+        code, out, err = load_settings(expr="s.REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES']")
+        self.assertEqual((code, out), (0, "['shop.throttling.FailOpenScopedRateThrottle']"), err)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -12,6 +12,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
+from rest_framework.throttling import SimpleRateThrottle
 
 from .models import Order, Product, SellerProfile
 from .serializers import CustomerSerializer, ProfileSerializer
@@ -475,3 +476,31 @@ class MalformedInputTests(ShopTestCase):
         self.client.force_authenticate(self.user)
         r = self.client.post('/api/v1/payments/razorpay/verify/', [], format='json')
         self.assertEqual(r.status_code, 400)
+
+
+class BrokenCache:
+    """A cache whose every operation fails, like Redis after an outage."""
+    def get(self, *args, **kwargs):
+        raise ConnectionError('redis unreachable')
+    set = get
+    add = get
+    incr = get
+    delete = get
+
+
+class RateLimitFailsOpenTests(ShopTestCase):
+    def test_login_still_answers_when_the_cache_is_down(self):
+        with patch.object(SimpleRateThrottle, 'cache', BrokenCache()):
+            wrong = self.client.post('/api/v1/auth/token/', {'username': 'a@b.com', 'password': 'wrong'}, format='json')
+            right = self.client.post('/api/v1/auth/token/', {'username': 'a@b.com', 'password': PASSWORD}, format='json')
+        self.assertEqual(wrong.status_code, 401)     # a normal auth failure, not a 500
+        self.assertEqual(right.status_code, 200)
+
+    def test_the_public_quote_endpoint_still_answers_when_the_cache_is_down(self):
+        with patch.object(SimpleRateThrottle, 'cache', BrokenCache()):
+            r = self.client.post('/api/v1/cart/quote/', {'lines': []}, format='json')
+        self.assertEqual(r.status_code, 200)
+
+    def test_limits_are_still_enforced_when_the_cache_works(self):
+        codes = [self.client.post('/api/v1/auth/token/', {'username': 'a@b.com', 'password': 'wrong'}, format='json').status_code for _ in range(9)]
+        self.assertEqual(codes[8], 429)
