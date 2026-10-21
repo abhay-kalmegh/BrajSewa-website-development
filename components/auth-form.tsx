@@ -4,14 +4,11 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiError, login, register } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
+import { safeNext } from '@/lib/safe-redirect'
 
 const inputClass = 'rounded-xl border border-[#24201d]/15 bg-white px-4 py-3 font-normal outline-none focus:border-[#d99a2b]'
 
-/** Only same-site relative paths, so `?next=` can't be used as an open redirect. */
-function destinationAfterAuth() {
-  const next = new URLSearchParams(window.location.search).get('next')
-  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/shop'
-}
+const destinationAfterAuth = () => safeNext(new URLSearchParams(window.location.search).get('next'), window.location.origin)
 
 export function AuthForm({ register: isRegister = false }: { register?: boolean }) {
   const router = useRouter()
