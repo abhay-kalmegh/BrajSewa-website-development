@@ -3,9 +3,9 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-homeshop2}
-      POSTGRES_USER: ${POSTGRES_USER:-homeshop2}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
+      POSTGRES_DB: ${POSTGRES_DB:-brajsewa}
+      POSTGRES_USER: ${POSTGRES_USER:-brajsewa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -14,18 +14,32 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: ./backend
     restart: unless-stopped
-    environment:
+    environment: &backend_env
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      # Local compose speaks plain HTTP. In production keep this true (or unset) and terminate TLS in front.
+      DJANGO_HTTPS_ONLY: ${DJANGO_HTTPS_ONLY:-false}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
-      POSTGRES_DB: ${POSTGRES_DB:-homeshop2}
-      POSTGRES_USER: ${POSTGRES_USER:-homeshop2}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+      API_NUM_PROXIES: ${API_NUM_PROXIES:-}
+      REDIS_URL: redis://redis:6379/0
+      POSTGRES_DB: ${POSTGRES_DB:-brajsewa}
+      POSTGRES_USER: ${POSTGRES_USER:-brajsewa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
@@ -34,20 +48,38 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"   # loopback only; remove entirely once a reverse proxy fronts the stack
+
+  # Releases stock held by unpaid orders (see shop/management/commands/expire_orders.py).
+  scheduler:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment: *backend_env
+    command: ["sh", "-c", "while true; do python manage.py expire_orders --minutes 30; sleep 300; done"]
+    healthcheck:
+      disable: true   # this container does not serve HTTP
+    depends_on:
+      backend:
+        condition: service_healthy
 
   frontend:
     build:
       context: .
-      args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api}
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api}
+      # Server-side only. The browser never talks to Django directly.
+      API_INTERNAL_URL: http://backend:8000
+      # Auth cookies are marked Secure when true. Compose runs over plain HTTP locally; set true behind HTTPS.
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      IMAGE_HOSTS: ${IMAGE_HOSTS:-}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "3000:3000"
 

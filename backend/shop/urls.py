@@ -1,11 +1,14 @@
 from django.urls import path
+
 from .payments import RazorpayVerifyView, RazorpayWebhookView
-from rest_framework_simplejwt.views import TokenObtainPairView
-from .views import CreateOrderView, MeView, OrderDetailView, ProductListView, RegisterView, SellerProductListCreateView
+from .views import (CreateOrderView, LoginView, LogoutView, MeView, OrderDetailView, ProductListView,
+                    RefreshView, RegisterView, SellerProductListCreateView)
 
 urlpatterns = [
     path('products/', ProductListView.as_view(), name='products'),
-    path('auth/token/', TokenObtainPairView.as_view(), name='token'),
+    path('auth/token/', LoginView.as_view(), name='token'),
+    path('auth/token/refresh/', RefreshView.as_view(), name='token-refresh'),
+    path('auth/token/blacklist/', LogoutView.as_view(), name='token-blacklist'),
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('account/me/', MeView.as_view(), name='account-me'),
     path('seller/products/', SellerProductListCreateView.as_view(), name='seller-products'),

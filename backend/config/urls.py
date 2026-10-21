@@ -1,8 +1,17 @@
+from django.conf import settings
+from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import include, path
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+
+def healthz(_request):
+    return HttpResponse('ok', content_type='text/plain')
+
 
 urlpatterns = [
-    path('api/v1/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/v1/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('healthz/', healthz, name='healthz'),
+    path(settings.ADMIN_URL, admin.site.urls),
+    # Auth routes live in shop.urls only. They were previously registered twice
+    # (here and in shop.urls), so the unthrottled copy here always won.
     path('api/v1/', include('shop.urls')),
 ]

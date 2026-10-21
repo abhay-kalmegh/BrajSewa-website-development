@@ -13,11 +13,11 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/brajsewa-logo.png',
+        url: '/icon-192.png',
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/brajsewa-logo.png',
+        url: '/icon-192.png',
         media: '(prefers-color-scheme: dark)',
       },
       {
