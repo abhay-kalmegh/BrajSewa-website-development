@@ -35,19 +35,6 @@ export type RazorpayPaymentResult = {
   razorpay_payment_id: string
   razorpay_signature: string
 }
-export type SellerProduct = {
-  id: number
-  name: string
-  slug: string
-  description: string
-  category: string
-  image_url: string
-  price_paise: number
-  compare_at_price_paise: number | null
-  inventory: number
-  active: boolean
-}
-
 export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly body: unknown) {
     super(message)
@@ -128,4 +115,3 @@ export const getOrder = (orderId: string | number) =>
 export const verifyPayment = (payload: RazorpayPaymentResult) =>
   request<{ status: string; orderId: string }>('/api/proxy/payments/razorpay/verify/', { method: 'POST', body: json(payload) })
 
-export const getSellerProducts = () => request<SellerProduct[]>('/api/proxy/seller/products/')
