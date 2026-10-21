@@ -9,5 +9,6 @@ paths = [
   '''\.env\.example$''',
   '''\.env\.local\.example$''',
   '''backend/shop/tests\.py$''',
+  '''backend/config/test_settings_guards\.py$''',
   '''pnpm-lock\.yaml$''',
 ]

@@ -9,6 +9,7 @@
  */
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { clientIp } from '@/lib/api/client-ip'
 
 const API = (process.env.API_INTERNAL_URL ?? '').replace(/\/$/, '')
 
@@ -77,13 +78,22 @@ export function guardMutation(req: Request, options: { requireJson?: boolean } =
 
 type DjangoInit = { method?: string; body?: string; headers?: Record<string, string>; req?: Request }
 
-/** Forward the client's address so Django's per-IP rate limiting sees users, not this server. */
+// How many proxies YOU operate between the internet and this server (CloudFront + ALB = 2, ALB only = 1, none = 0).
+const TRUSTED_PROXY_HOPS = Number(process.env.TRUSTED_PROXY_HOPS ?? '1')
+
+/**
+ * Tell Django who the caller is so its per-IP rate limiting sees users, not this server.
+ * The client-supplied X-Forwarded-For is NOT copied as-is: a forged value would give every request a fresh
+ * rate-limit bucket. We send one address, taken from the hops our own infrastructure appended.
+ */
 function forwardedHeaders(req?: Request): Record<string, string> {
   const headers: Record<string, string> = {}
-  const forwardedFor = req?.headers.get('x-forwarded-for')
-  const forwardedProto = req?.headers.get('x-forwarded-proto')
-  if (forwardedFor) headers['X-Forwarded-For'] = forwardedFor
-  if (forwardedProto) headers['X-Forwarded-Proto'] = forwardedProto
+  const ip = clientIp(req?.headers.get('x-forwarded-for'), TRUSTED_PROXY_HOPS)
+  if (ip) headers['X-Forwarded-For'] = ip
+  // Django enforces HTTPS and trusts this header, but this hop is plain HTTP on a private network. Without it Django
+  // would redirect every internal call to https:// and the site would break. We assert it ourselves in production
+  // instead of relaying whatever the client sent.
+  if (process.env.NODE_ENV === 'production') headers['X-Forwarded-Proto'] = 'https'
   return headers
 }
 

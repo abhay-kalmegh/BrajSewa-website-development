@@ -1,4 +1,5 @@
 import os
+import warnings
 from datetime import timedelta
 from pathlib import Path
 
@@ -77,6 +78,9 @@ REST_FRAMEWORK = {
 }
 if API_NUM_PROXIES is not None:
     REST_FRAMEWORK['NUM_PROXIES'] = int(API_NUM_PROXIES)
+elif not DEBUG:
+    warnings.warn('API_NUM_PROXIES is not set: DRF then trusts the whole X-Forwarded-For header, so per-IP rate limits '
+                  'can be bypassed with a forged header. Set it to the number of proxies in front of Django.', RuntimeWarning)
 
 # Throttle counters must be shared between gunicorn workers and survive restarts, so use Redis
 # when REDIS_URL is set. The in-memory fallback is per-process and only suitable for development.

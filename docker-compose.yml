@@ -35,7 +35,7 @@ services:
       DJANGO_HTTPS_ONLY: ${DJANGO_HTTPS_ONLY:-false}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
-      API_NUM_PROXIES: ${API_NUM_PROXIES:-}
+      API_NUM_PROXIES: ${API_NUM_PROXIES:-1}      # Next.js is the single proxy in front of Django
       REDIS_URL: redis://redis:6379/0
       POSTGRES_DB: ${POSTGRES_DB:-brajsewa}
       POSTGRES_USER: ${POSTGRES_USER:-brajsewa}
@@ -74,6 +74,7 @@ services:
       NODE_ENV: production
       # Server-side only. The browser never talks to Django directly.
       API_INTERNAL_URL: http://backend:8000
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
       # Auth cookies are marked Secure when true. Compose runs over plain HTTP locally; set true behind HTTPS.
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       IMAGE_HOSTS: ${IMAGE_HOSTS:-}
