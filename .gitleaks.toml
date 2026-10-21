@@ -1,0 +1,13 @@
+title = "brajsewa gitleaks config"
+
+[extend]
+useDefault = true            # keep all of gitleaks' built-in rules
+
+[allowlist]
+description = "Placeholder values in templates and test fixtures are not secrets"
+paths = [
+  '''\.env\.example$''',
+  '''\.env\.local\.example$''',
+  '''backend/shop/tests\.py$''',
+  '''pnpm-lock\.yaml$''',
+]

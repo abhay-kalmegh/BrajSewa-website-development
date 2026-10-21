@@ -6,8 +6,11 @@ __v0_jsx-dev-runtime.ts
 .v0-trash/
 .vercel/
 
-# Environment variables
-.env*.local
+# Environment files: ignore every real one, re-allow only the committed templates
+.env
+.env.*
+!.env.example
+!.env.local.example
 
 # Common ignores
 node_modules
