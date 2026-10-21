@@ -25,6 +25,14 @@ class RepoHygiene(unittest.TestCase):
         for path in ['.env', '.env.production', '.env.staging', '.env.local', 'backend/.env', 'backend/.env.production']:
             self.assertTrue(ignored(path), f'{path} would be committed by `git add .`')
 
+    def test_python_bytecode_is_ignored_everywhere(self):
+        for path in ['tests/__pycache__/x.cpython-312.pyc', 'backend/shop/__pycache__/y.cpython-312.pyc', 'z.pyc']:
+            self.assertTrue(ignored(path), f'{path} would be committed')
+
+    def test_no_bytecode_is_tracked(self):
+        tracked = [f for f in git('ls-files').stdout.split() if f.endswith('.pyc') or '/__pycache__/' in f]
+        self.assertEqual(tracked, [])
+
     def test_templates_are_not_ignored(self):
         for path in ['.env.example', '.env.local.example']:
             self.assertFalse(ignored(path), f'{path} must stay committable')
