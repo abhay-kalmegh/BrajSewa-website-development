@@ -85,7 +85,10 @@ services:
       context: ./backend
     restart: unless-stopped
     environment: *backend_env
-    command: ["sh", "-c", "while true; do python manage.py expire_orders --minutes 30; sleep 300; done"]
+    # Every 5 minutes release stock held by unpaid orders; every hour (12th pass) reconcile captured payments against orders.
+    # `|| true` keeps the loop alive when reconcile exits non-zero to flag a discrepancy (it logs "MANUAL REVIEW" lines).
+    # `$$` is compose's escape for a literal `$`.
+    command: ["sh", "-c", "i=0; while true; do python manage.py expire_orders --minutes 30; i=$$((i+1)); if [ $$((i % 12)) -eq 0 ]; then python manage.py reconcile_payments || true; fi; sleep 300; done"]
     healthcheck:
       disable: true   # this container does not serve HTTP
     depends_on:

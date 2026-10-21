@@ -58,6 +58,13 @@ class ReleaseConfigTests(unittest.TestCase):
         with open('Dockerfile') as handle:
             self.assertIn('/api/health', handle.read())
 
+    def test_scheduler_expires_orders_and_reconciles_payments(self):
+        command = ' '.join(compose()['scheduler']['command'])
+        self.assertIn('expire_orders', command)
+        self.assertIn('reconcile_payments', command)
+        self.assertIn('|| true', command)          # a reported discrepancy must not stop the loop that expires orders
+        self.assertIn('$$', command)               # compose requires `$$` for a literal `$`
+
     def test_only_one_service_migrates(self):
         migrating = [n for n, s in compose().items() if 'migrate' in json.dumps(s.get('command', ''))]
         self.assertEqual(migrating, ['migrate'])

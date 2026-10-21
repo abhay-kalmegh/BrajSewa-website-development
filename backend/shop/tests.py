@@ -617,3 +617,40 @@ class ApiExposureTests(TestCase):
     def test_no_cross_origin_access_is_granted(self):
         r = self.client.get('/api/v1/products/', HTTP_ORIGIN='https://evil.example')
         self.assertNotIn('Access-Control-Allow-Origin', r)
+
+
+class ReconcilePaymentsCommandTests(ShopTestCase):
+    """The command wires Razorpay's client to the pure logic tested in shop/test_reconcile.py."""
+
+    def run_command(self, items):
+        out = StringIO()
+        with patch('shop.management.commands.reconcile_payments.razorpay.Client') as client:
+            client.return_value.payment.all.return_value = {'items': items}
+            call_command('reconcile_payments', '--grace-minutes', '0', stdout=out)
+        return out.getvalue()
+
+    def captured(self, order_id, amount=34_800, pid='pay_1'):
+        return {'id': pid, 'order_id': order_id, 'amount': amount, 'status': 'captured', 'created_at': 1}
+
+    def test_a_paid_order_reconciles_cleanly(self):
+        self.place_order(razorpay_id='order_X')
+        Order.objects.update(status=Order.Status.PAID)
+        self.assertIn('no discrepancies', self.run_command([self.captured('order_X')]))
+
+    def test_a_charged_but_unpaid_order_is_reported_and_fails_the_command(self):
+        from django.core.management.base import CommandError
+        self.place_order(razorpay_id='order_X')                     # still pending
+        with self.assertRaises(CommandError) as ctx:
+            self.run_command([self.captured('order_X')])
+        self.assertIn('1 discrepancy', str(ctx.exception))
+
+    def test_a_payment_for_an_unknown_order_is_reported(self):
+        from django.core.management.base import CommandError
+        with self.assertRaises(CommandError):
+            self.run_command([self.captured('order_nobody_knows')])
+
+    def test_missing_razorpay_keys_is_a_clear_error(self):
+        from django.core.management.base import CommandError
+        with override_settings(RAZORPAY_KEY_ID='', RAZORPAY_KEY_SECRET=''):
+            with self.assertRaises(CommandError):
+                call_command('reconcile_payments')
