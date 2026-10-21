@@ -6,6 +6,8 @@ from io import StringIO
 from unittest.mock import patch
 
 from django.conf import settings as django_settings
+from django.contrib import admin
+from django.test import RequestFactory
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.management import call_command
@@ -520,3 +522,59 @@ class RequestIdTests(TestCase):
 
     def test_middleware_order_puts_health_then_request_id_first(self):
         self.assertEqual(django_settings.MIDDLEWARE[:2], ['config.health.HealthCheckMiddleware', 'config.logging_utils.RequestIdMiddleware'])
+
+
+class AdminHardeningTests(ShopTestCase):
+    def setUp(self):
+        super().setUp()
+        self.staff = get_user_model().objects.create_superuser('staff@b.com', 'staff@b.com', PASSWORD)
+        request = RequestFactory().post('/admin/')
+        request.user = self.staff
+        request.session = {}
+        request._messages = type('Messages', (), {'add': lambda *a, **k: None})()   # message_user needs a message store
+        self.request = request
+        self.order_admin = admin.site._registry[Order]
+
+    def make_order(self, status):
+        return Order.objects.create(user=self.user, email='a@b.com', phone='9', first_name='A', address='x', city='c',
+                                    state='s', postal_code='560001', status=status, subtotal_paise=100, total_paise=100)
+
+    def test_order_status_cannot_be_edited_by_hand(self):
+        self.assertIn('status', self.order_admin.get_readonly_fields(self.request))
+
+    def test_orders_cannot_be_added_or_deleted_in_the_admin(self):
+        self.assertFalse(self.order_admin.has_add_permission(self.request))
+        self.assertFalse(self.order_admin.has_delete_permission(self.request))
+
+    def test_mark_fulfilled_moves_only_paid_orders(self):
+        paid, pending, failed = (self.make_order(s) for s in (Order.Status.PAID, Order.Status.PENDING, Order.Status.FAILED))
+        self.order_admin.mark_fulfilled(self.request, Order.objects.all())
+        statuses = {o.pk: o.status for o in Order.objects.all()}
+        self.assertEqual(statuses[paid.pk], Order.Status.FULFILLED)
+        self.assertEqual(statuses[pending.pk], Order.Status.PENDING)     # an unpaid order can NEVER be shipped from here
+        self.assertEqual(statuses[failed.pk], Order.Status.FAILED)
+
+    def test_mark_fulfilled_leaves_an_audit_trail(self):
+        from django.contrib.admin.models import LogEntry
+        paid = self.make_order(Order.Status.PAID)
+        self.order_admin.mark_fulfilled(self.request, Order.objects.filter(pk=paid.pk))
+        entry = LogEntry.objects.get(object_id=str(paid.pk))
+        self.assertEqual(entry.user_id, self.staff.pk)
+        self.assertIn('fulfilled', entry.change_message)
+
+    def test_product_price_is_not_inline_editable(self):
+        self.assertNotIn('price_paise', admin.site._registry[Product].list_editable)
+
+    def test_seller_approval_is_an_explicit_logged_action_not_an_inline_checkbox(self):
+        seller_admin = admin.site._registry[SellerProfile]
+        self.assertNotIn('approved', seller_admin.list_editable)
+        profile = SellerProfile.objects.create(user=self.user, display_name='A', approved=False)
+        seller_admin.approve_sellers(self.request, SellerProfile.objects.filter(pk=profile.pk))
+        profile.refresh_from_db()
+        self.assertTrue(profile.approved)
+        seller_admin.revoke_sellers(self.request, SellerProfile.objects.filter(pk=profile.pk))
+        profile.refresh_from_db()
+        self.assertFalse(profile.approved)
+
+    def test_admin_actions_require_the_change_permission(self):
+        self.assertEqual(list(self.order_admin.mark_fulfilled.allowed_permissions), ['change'])   # Django stores the list as given

@@ -179,5 +179,30 @@ class LoggingSettingsTests(unittest.TestCase):
             self.assertIn('python-json-logger', handle.read())
 
 
+
+class AdminSessionTests(unittest.TestCase):
+    def test_admin_session_is_eight_hours_not_two_weeks(self):
+        code, out, err = load_settings(expr='s.SESSION_COOKIE_AGE')
+        self.assertEqual((code, out), (0, '28800'), err)
+
+    def test_admin_session_length_is_configurable(self):
+        code, out, err = load_settings({'ADMIN_SESSION_HOURS': '1'}, expr='s.SESSION_COOKIE_AGE')
+        self.assertEqual((code, out), (0, '3600'), err)
+
+    def test_session_ends_with_the_browser_and_is_strict(self):
+        code, out, err = load_settings(expr='(s.SESSION_EXPIRE_AT_BROWSER_CLOSE, s.SESSION_COOKIE_SAMESITE)')
+        self.assertEqual((code, out), (0, "(True, 'Strict')"), err)
+
+    def test_default_admin_path_in_production_warns(self):
+        code, _, err = load_settings()
+        self.assertEqual(code, 0, err)
+        self.assertIn('default /admin/ path', err)
+
+    def test_custom_admin_path_is_quiet(self):
+        code, _, err = load_settings({'DJANGO_ADMIN_PATH': 'staff-7f3a/'})
+        self.assertEqual(code, 0, err)
+        self.assertNotIn('default /admin/ path', err)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -150,6 +150,14 @@ STORAGES = {
     'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
 }
 
+# Django admin login session. (Customers use JWT cookies from the Next.js app; this cookie is for staff only.)
+SESSION_COOKIE_AGE = int(os.getenv('ADMIN_SESSION_HOURS', '8')) * 3600      # default 2 WEEKS is far too long for an admin
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_SAMESITE = 'Strict'
+if not DEBUG and ADMIN_URL == 'admin/':
+    warnings.warn('The Django admin is served at the default /admin/ path. Move it with DJANGO_ADMIN_PATH and, above all, '
+                  'keep it off the public internet (VPN / IP allow-list / internal load balancer).', RuntimeWarning)
+
 LANGUAGE_CODE = 'en-in'
 TIME_ZONE = 'Asia/Kolkata'
 USE_I18N = True
