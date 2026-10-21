@@ -1,4 +1,4 @@
-import { Analytics } from '@vercel/analytics/next'
+import { SafeAnalytics } from '@/components/safe-analytics'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth'
@@ -49,7 +49,7 @@ export default function RootLayout({
         <AuthProvider>
           <CartProvider>{children}</CartProvider>
         </AuthProvider>
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        <SafeAnalytics />
       </body>
     </html>
   )

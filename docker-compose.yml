@@ -95,6 +95,11 @@ services:
   frontend:
     build:
       context: .
+      args:      # baked in at build time; changing them needs `docker compose build frontend`
+        CSP_ENFORCE: ${CSP_ENFORCE:-false}
+        CSP_REPORT_URI: ${CSP_REPORT_URI:-}
+        HSTS_MAX_AGE_SECONDS: ${HSTS_MAX_AGE_SECONDS:-3600}
+        HSTS_INCLUDE_SUBDOMAINS: ${HSTS_INCLUDE_SUBDOMAINS:-false}
     restart: unless-stopped
     environment:
       NODE_ENV: production

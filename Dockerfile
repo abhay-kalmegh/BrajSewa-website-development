@@ -10,6 +10,12 @@ RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Security-header settings are resolved at BUILD time (Next.js bakes headers() into the routes manifest).
+ARG CSP_ENFORCE=false
+ARG CSP_REPORT_URI=
+ARG HSTS_MAX_AGE_SECONDS=3600
+ARG HSTS_INCLUDE_SUBDOMAINS=false
+ENV CSP_ENFORCE=$CSP_ENFORCE CSP_REPORT_URI=$CSP_REPORT_URI HSTS_MAX_AGE_SECONDS=$HSTS_MAX_AGE_SECONDS HSTS_INCLUDE_SUBDOMAINS=$HSTS_INCLUDE_SUBDOMAINS
 RUN pnpm build
 
 FROM node:22-alpine AS runner
