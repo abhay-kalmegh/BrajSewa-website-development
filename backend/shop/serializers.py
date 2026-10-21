@@ -3,7 +3,10 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from django.conf import settings
+
 from .models import Order, OrderLine, Product
+from .validators import PIN_CODE_PATTERN, clean_details, is_allowed_image
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -31,6 +34,17 @@ class SellerProductSerializer(serializers.ModelSerializer):
     price_paise = serializers.IntegerField(min_value=1)
     compare_at_price_paise = serializers.IntegerField(min_value=1, required=False, allow_null=True)
 
+    def validate_image_url(self, value):
+        if not is_allowed_image(value, settings.ALLOWED_IMAGE_HOSTS):
+            raise serializers.ValidationError('Use an https image from an approved host, or a path on this site.')
+        return value
+
+    def validate_details(self, value):
+        try:
+            return clean_details(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc))
+
     class Meta:
         model = Product
         fields = ['id', 'name', 'slug', 'description', 'category', 'image_url', 'badge', 'details',
@@ -50,9 +64,8 @@ class CustomerSerializer(serializers.Serializer):
     address = serializers.CharField(max_length=500)
     city = serializers.CharField(max_length=100)
     state = serializers.CharField(max_length=100)
-    # Raw string with a single backslash: exactly six digits (Indian PIN code).
-    # The previous r'^\\d{6}$' matched a literal backslash followed by "d{6}" and never validated.
-    postalCode = serializers.RegexField(r'^\d{6}$', error_messages={'invalid': 'Enter a valid 6-digit PIN code.'})
+    # Six ASCII digits, not starting with 0 (see shop/validators.py: `\\d` also matches Arabic-Indic/Devanagari digits).
+    postalCode = serializers.RegexField(PIN_CODE_PATTERN, error_messages={'invalid': 'Enter a valid 6-digit PIN code.'})
 
 
 class CreateOrderSerializer(serializers.Serializer):

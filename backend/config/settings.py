@@ -34,6 +34,8 @@ if not DEBUG:
     if len(JWT_SIGNING_KEY) < 50 or len(set(JWT_SIGNING_KEY)) < 20:
         raise ImproperlyConfigured('JWT_SIGNING_KEY is too weak: use at least 50 characters with real variety.')
 ALLOWED_HOSTS = env_list('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1')
+# Hosts a seller-supplied product image may point at (keep in step with IMAGE_HOSTS / next.config.mjs).
+ALLOWED_IMAGE_HOSTS = ['images.unsplash.com', *env_list('IMAGE_HOSTS')]
 
 INSTALLED_APPS = [
     'corsheaders', 'rest_framework', 'rest_framework_simplejwt.token_blacklist',

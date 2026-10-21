@@ -578,3 +578,28 @@ class AdminHardeningTests(ShopTestCase):
 
     def test_admin_actions_require_the_change_permission(self):
         self.assertEqual(list(self.order_admin.mark_fulfilled.allowed_permissions), ['change'])   # Django stores the list as given
+
+
+class InputValidationTests(ShopTestCase):
+    def test_postal_codes_with_non_ascii_digits_or_a_leading_zero_are_rejected_at_checkout(self):
+        self.client.force_authenticate(self.user)
+        for pin in ('\u0665\u0666\u0660\u0660\u0660\u0661', '060001', '56001', 'abcdef'):
+            body = {'customer': {**CUSTOMER, 'postalCode': pin}, 'lines': [{'productId': self.product.id, 'quantity': 1}]}
+            self.assertEqual(self.client.post('/api/v1/orders/', body, format='json').status_code, 400, pin)
+
+    def seller_post(self, **overrides):
+        SellerProfile.objects.update_or_create(user=self.user, defaults={'display_name': 'A', 'approved': True})
+        self.client.force_authenticate(self.user)
+        body = {'name': 'Ittar', 'slug': 'ittar-x', 'price_paise': 24_900, 'inventory': 5, **overrides}
+        return self.client.post('/api/v1/seller/products/', body, format='json')
+
+    def test_seller_image_must_be_a_site_path_or_an_approved_https_host(self):
+        self.assertEqual(self.seller_post(slug='ok-1', image_url='https://images.unsplash.com/photo-1').status_code, 201)
+        self.assertEqual(self.seller_post(slug='ok-2', image_url='/braj-seva-hero.webp').status_code, 201)
+        for bad in ('https://evil.com/x.png', 'http://images.unsplash.com/x', 'javascript:alert(1)', '//evil.com/x'):
+            self.assertEqual(self.seller_post(slug='bad', image_url=bad).status_code, 400, bad)
+
+    def test_seller_details_must_be_a_short_list_of_text_lines(self):
+        self.assertEqual(self.seller_post(slug='ok-3', details=['108 beads', 'Keep dry']).status_code, 201)
+        for bad in ([{'a': 1}], 'not a list', ['x'] * 11, ['x' * 201], ['']):
+            self.assertEqual(self.seller_post(slug='bad', details=bad).status_code, 400, repr(bad))

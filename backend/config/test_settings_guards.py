@@ -204,5 +204,16 @@ class AdminSessionTests(unittest.TestCase):
         self.assertNotIn('default /admin/ path', err)
 
 
+
+class ImageHostSettingsTests(unittest.TestCase):
+    def test_unsplash_is_allowed_by_default(self):
+        code, out, err = load_settings(expr='s.ALLOWED_IMAGE_HOSTS')
+        self.assertEqual((code, out), (0, "['images.unsplash.com']"), err)
+
+    def test_extra_hosts_come_from_image_hosts(self):
+        code, out, err = load_settings({'IMAGE_HOSTS': 'cdn.brajsewa.com, media.example.org'}, expr='s.ALLOWED_IMAGE_HOSTS')
+        self.assertEqual((code, out), (0, "['images.unsplash.com', 'cdn.brajsewa.com', 'media.example.org']"), err)
+
+
 if __name__ == '__main__':
     unittest.main()
