@@ -20,6 +20,7 @@ from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairVi
 
 from . import cart as cart_logic
 from .models import BuyerProfile, Order, OrderLine, Product, SellerProfile
+from .inputs import mapping_or_empty
 from .pricing import shipping_for
 from .serializers import (CartLinesSerializer, CreateOrderSerializer, OrderSerializer, ProductSerializer,
                           ProfileSerializer, RegisterSerializer, SellerProductSerializer)
@@ -45,7 +46,7 @@ class LoginEmailThrottle(SimpleRateThrottle):
     scope = 'login_email'
 
     def get_cache_key(self, request, view):
-        username = str(request.data.get('username', '')).strip().lower()
+        username = str(mapping_or_empty(request.data).get('username', '')).strip().lower()
         if not username:
             return None
         ident = hashlib.sha256(username.encode()).hexdigest()  # safe for any cache backend

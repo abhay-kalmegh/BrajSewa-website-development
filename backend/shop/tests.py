@@ -445,3 +445,33 @@ class HealthCheckTests(TestCase):
 
     def test_host_validation_is_still_enforced_elsewhere(self):
         self.assertEqual(self.client.get('/api/v1/products/', HTTP_HOST='evil.example').status_code, 400)
+
+
+class MalformedInputTests(ShopTestCase):
+    """Bad input must be answered with a 4xx, never a 500, including on unauthenticated endpoints."""
+    WEBHOOK = '/api/v1/payments/razorpay/webhook/'
+
+    def test_webhook_with_a_non_ascii_signature_header_is_400(self):
+        r = self.client.post(self.WEBHOOK, b'{}', content_type='application/json', HTTP_X_RAZORPAY_SIGNATURE='\xe9')
+        self.assertEqual(r.status_code, 400)
+
+    def test_webhook_with_a_valid_signature_but_non_object_body_is_400(self):
+        raw = b'[]'
+        r = self.client.post(self.WEBHOOK, raw, content_type='application/json', HTTP_X_RAZORPAY_SIGNATURE=sign('whsec', raw))
+        self.assertEqual(r.status_code, 400)
+
+    def test_webhook_with_unexpected_nested_shapes_is_acknowledged_not_crashed(self):
+        raw = json.dumps({'event': 'payment.captured', 'payload': {'payment': 'not-an-object'}}).encode()
+        r = self.client.post(self.WEBHOOK, raw, content_type='application/json', HTTP_X_RAZORPAY_SIGNATURE=sign('whsec', raw))
+        self.assertEqual(r.status_code, 200)
+
+    def test_login_with_a_non_object_json_body_is_a_client_error(self):
+        for body in ('[]', '"text"', '123', 'null'):
+            r = self.client.post('/api/v1/auth/token/', body, content_type='application/json')
+            self.assertLess(r.status_code, 500, body)
+            self.assertGreaterEqual(r.status_code, 400, body)
+
+    def test_verify_with_a_non_object_body_is_400(self):
+        self.client.force_authenticate(self.user)
+        r = self.client.post('/api/v1/payments/razorpay/verify/', [], format='json')
+        self.assertEqual(r.status_code, 400)

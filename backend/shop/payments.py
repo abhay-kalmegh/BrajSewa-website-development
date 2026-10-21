@@ -9,6 +9,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .inputs import dig, mapping_or_empty, safe_equal
 from .models import Order
 from .services import mark_paid
 
@@ -30,14 +31,15 @@ class RazorpayVerifyView(APIView):
     throttle_scope = 'payments'
 
     def post(self, request):
-        order_id = str(request.data.get('razorpay_order_id', ''))
-        payment_id = str(request.data.get('razorpay_payment_id', ''))
-        signature = str(request.data.get('razorpay_signature', ''))
+        data = mapping_or_empty(request.data)          # a JSON array/string/null body must be a 400, not a crash
+        order_id = str(data.get('razorpay_order_id', ''))
+        payment_id = str(data.get('razorpay_payment_id', ''))
+        signature = str(data.get('razorpay_signature', ''))
         if not (order_id and payment_id and signature) or not settings.RAZORPAY_KEY_SECRET:
             return Response({'detail': 'Invalid payment confirmation.'}, status=status.HTTP_400_BAD_REQUEST)
 
         expected = _signature(settings.RAZORPAY_KEY_SECRET, f'{order_id}|{payment_id}'.encode())
-        if not hmac.compare_digest(expected, signature):
+        if not safe_equal(expected, signature):
             return Response({'detail': 'Invalid payment signature.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not Order.objects.filter(razorpay_order_id=order_id, user=request.user).exists():
@@ -59,7 +61,7 @@ class RazorpayWebhookView(APIView):
             return Response({'detail': 'Webhook secret is not configured.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         raw_body = request.body
         expected = _signature(settings.RAZORPAY_WEBHOOK_SECRET, raw_body)
-        if not hmac.compare_digest(expected, request.headers.get('X-Razorpay-Signature', '')):
+        if not safe_equal(expected, request.headers.get('X-Razorpay-Signature', '')):   # non-ASCII header must not 500
             return Response({'detail': 'Invalid webhook signature.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -67,10 +69,13 @@ class RazorpayWebhookView(APIView):
         except ValueError:
             return Response({'detail': 'Malformed body.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if not isinstance(body, dict):
+            return Response({'detail': 'Malformed body.'}, status=status.HTTP_400_BAD_REQUEST)
+
         if body.get('event') in ('payment.captured', 'order.paid'):
-            payment = body.get('payload', {}).get('payment', {}).get('entity', {})
+            payment = dig(body, 'payload', 'payment', 'entity')
             if payment.get('order_id'):
-                mark_paid(payment['order_id'], payment.get('id', ''), payment.get('amount'))
+                mark_paid(str(payment['order_id']), str(payment.get('id', '')), payment.get('amount'))
         # Always 200 for authentic events we do not act on, so Razorpay stops retrying them.
         # payment.failed is deliberately ignored: the customer can retry on the same Razorpay
         # order, and stale reservations are released by `manage.py expire_orders`.
