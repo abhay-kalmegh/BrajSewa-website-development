@@ -70,6 +70,8 @@ REST_FRAMEWORK = {
         'login_email': '8/min',    # per target account, regardless of IP
         'orders': '20/hour',       # per user
         'payments': '60/hour',     # per user
+        'quote': '120/min',        # per IP: cart pricing (public)
+        'cart': '240/min',         # per user: saved-cart sync
     },
 }
 if API_NUM_PROXIES is not None:

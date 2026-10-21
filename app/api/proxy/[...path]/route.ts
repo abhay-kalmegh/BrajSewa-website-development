@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server'
-import { authedFetch, guardMutation, jsonError } from '@/lib/api/server'
+import { authedFetch, djangoFetch, guardMutation, jsonError } from '@/lib/api/server'
 
 /**
  * Authenticated pass-through to Django. The browser calls /api/proxy/<path>; this handler adds the
  * Bearer token from the httpOnly cookie. Only the routes below are reachable, so adding an endpoint
  * to Django never silently exposes it to the browser.
  */
-const ALLOWED: Array<{ prefix: string; methods: string[] }> = [
-  { prefix: 'orders/', methods: ['GET', 'POST'] }, // create order, order detail
+const ALLOWED: Array<{ prefix: string; methods: string[]; public?: boolean }> = [
+  // First match wins, so the specific cart routes come before the generic one.
+  { prefix: 'cart/quote/', methods: ['POST'], public: true }, // live prices for guests and customers
+  { prefix: 'cart/merge/', methods: ['POST'] },
+  { prefix: 'cart/', methods: ['GET', 'PUT'] }, // the signed-in customer's saved cart
+  { prefix: 'orders/', methods: ['GET', 'POST'] }, // order history, create order, order detail
   { prefix: 'payments/razorpay/verify/', methods: ['POST'] },
   { prefix: 'account/me/', methods: ['GET'] },
   { prefix: 'seller/products/', methods: ['GET', 'POST'] },
@@ -30,11 +34,10 @@ async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }
 
   let upstream: Response | null
   try {
-    upstream = await authedFetch(`/${target}${new URL(req.url).search}`, {
-      method: req.method,
-      body: req.method === 'GET' ? undefined : await req.text(),
-      req,
-    })
+    const url = `/${target}${new URL(req.url).search}`
+    const init = { method: req.method, body: req.method === 'GET' ? undefined : await req.text(), req }
+    // Public routes work without a session (guests price their cart here); everything else needs one.
+    upstream = rule.public ? await djangoFetch(url, init) : await authedFetch(url, init)
   } catch {
     return jsonError('Service temporarily unavailable.', 502)
   }
@@ -49,4 +52,4 @@ async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }
   })
 }
 
-export { handle as GET, handle as POST }
+export { handle as GET, handle as POST, handle as PUT }

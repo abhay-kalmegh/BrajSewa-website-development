@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiError, login, register } from '@/lib/api/client'
+import { useAuth } from '@/lib/auth'
 
 const inputClass = 'rounded-xl border border-[#24201d]/15 bg-white px-4 py-3 font-normal outline-none focus:border-[#d99a2b]'
 
@@ -14,6 +15,7 @@ function destinationAfterAuth() {
 
 export function AuthForm({ register: isRegister = false }: { register?: boolean }) {
   const router = useRouter()
+  const { refresh } = useAuth()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
@@ -38,6 +40,8 @@ export function AuthForm({ register: isRegister = false }: { register?: boolean 
       } else {
         await login({ email: value('email'), password: String(form.get('password') ?? '') })
       }
+      // Load the new session first: that is what makes the header update and triggers the cart merge.
+      await refresh()
       router.push(destinationAfterAuth())
       router.refresh()
     } catch (caught) {

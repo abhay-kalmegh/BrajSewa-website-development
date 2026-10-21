@@ -16,6 +16,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck                  # type errors now fail the build
+      - run: npx --yes tsx tests/cart-logic.test.ts   # cart reconciliation, stored-cart parsing, price helpers
       - run: pnpm build
         env:
           API_INTERNAL_URL: http://localhost:8000

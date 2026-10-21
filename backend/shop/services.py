@@ -9,6 +9,9 @@ from .models import Order, Product
 
 logger = logging.getLogger(__name__)
 
+# How long an unpaid order may hold stock. Used by expire_orders and by checkout's order reuse.
+PENDING_ORDER_TTL_MINUTES = 30
+
 
 def release_order(order_id, new_status):
     """Return reserved stock for a still-pending order and move it to `new_status`.

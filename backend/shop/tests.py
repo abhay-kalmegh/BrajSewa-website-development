@@ -32,9 +32,9 @@ class ShopTestCase(APITestCase):
         self.user = get_user_model().objects.create_user('a@b.com', 'a@b.com', PASSWORD, first_name='A')
         self.product = Product.objects.create(name='Mala', slug='mala', price_paise=29_900, inventory=3)
 
-    def place_order(self, qty=1, lines=None, razorpay_id='order_X'):
+    def place_order(self, qty=1, lines=None, razorpay_id='order_X', **extra):
         self.client.force_authenticate(self.user)
-        body = {'customer': CUSTOMER, 'lines': lines or [{'productId': self.product.id, 'quantity': qty}]}
+        body = {'customer': CUSTOMER, 'lines': lines or [{'productId': self.product.id, 'quantity': qty}], **extra}
         with patch('shop.views.razorpay.Client') as client:
             client.return_value.order.create.return_value = {'id': razorpay_id}
             return self.client.post('/api/v1/orders/', body, format='json')
@@ -256,3 +256,167 @@ class InventoryRestorationTests(ShopTestCase):
         self.assertIn('Expired 0', self.run_expiry())
         self.product.refresh_from_db()
         self.assertEqual(self.product.inventory, 3)  # not double-restored
+
+
+class CatalogTests(ShopTestCase):
+    def test_list_hides_unlisted_and_sold_out_products(self):
+        Product.objects.create(name='Hidden', slug='hidden', price_paise=100, inventory=5, listed=False)
+        Product.objects.create(name='Gone', slug='gone', price_paise=100, inventory=0)
+        slugs = [p['slug'] for p in self.client.get('/api/v1/products/').data]
+        self.assertEqual(slugs, ['mala'])
+
+    def test_detail_resolves_by_slug_including_sold_out_but_not_inactive(self):
+        Product.objects.create(name='Gone', slug='gone', price_paise=100, inventory=0)
+        Product.objects.create(name='Off', slug='off', price_paise=100, inventory=5, active=False)
+        r = self.client.get('/api/v1/products/mala/')
+        self.assertEqual((r.status_code, r.data['price'], r.data['category']), (200, 299.0, 'General'))
+        self.assertEqual(self.client.get('/api/v1/products/gone/').status_code, 200)
+        self.assertEqual(self.client.get('/api/v1/products/off/').status_code, 404)
+        self.assertEqual(self.client.get('/api/v1/products/nope/').status_code, 404)
+
+
+class CartTests(ShopTestCase):
+    def lines(self, qty, product=None):
+        return {'lines': [{'productId': (product or self.product).id, 'quantity': qty}]}
+
+    def test_quote_is_public_and_uses_server_prices_and_stock(self):
+        r = self.client.post('/api/v1/cart/quote/', self.lines(5), format='json')
+        self.assertEqual(r.status_code, 200, r.data)
+        line = r.data['lines'][0]
+        self.assertEqual((line['quantity'], line['issue'], line['pricePaise']), (3, 'reduced', 29_900))
+        self.assertEqual((r.data['subtotalPaise'], r.data['shippingPaise'], r.data['totalPaise']), (89_700, 0, 89_700))
+
+    def test_quote_adds_shipping_below_threshold_and_flags_unavailable_products(self):
+        r = self.client.post('/api/v1/cart/quote/', {'lines': [{'productId': self.product.id, 'quantity': 1},
+                                                                  {'productId': 999_999, 'quantity': 1}]}, format='json')
+        self.assertEqual(r.data['totalPaise'], 29_900 + 4_900)
+        self.assertEqual(r.data['lines'][1]['issue'], 'unavailable')
+        self.assertEqual(r.data['lines'][1]['quantity'], 0)
+
+    def test_empty_cart_has_no_shipping(self):
+        r = self.client.post('/api/v1/cart/quote/', {'lines': []}, format='json')
+        self.assertEqual((r.data['subtotalPaise'], r.data['shippingPaise'], r.data['totalPaise']), (0, 0, 0))
+
+    def test_saved_cart_requires_auth(self):
+        self.assertEqual(self.client.get('/api/v1/cart/').status_code, 401)
+        self.assertEqual(self.client.put('/api/v1/cart/', self.lines(1), format='json').status_code, 401)
+        self.assertEqual(self.client.post('/api/v1/cart/merge/', self.lines(1), format='json').status_code, 401)
+
+    def test_put_replaces_and_get_returns_the_saved_cart(self):
+        self.client.force_authenticate(self.user)
+        self.assertEqual(self.client.put('/api/v1/cart/', self.lines(2), format='json').status_code, 200)
+        self.assertEqual(self.client.get('/api/v1/cart/').data['lines'][0]['quantity'], 2)
+        self.client.put('/api/v1/cart/', {'lines': []}, format='json')
+        self.assertEqual(self.client.get('/api/v1/cart/').data['lines'], [])
+
+    def test_saved_cart_is_clamped_to_stock(self):
+        self.client.force_authenticate(self.user)
+        self.client.put('/api/v1/cart/', self.lines(10), format='json')
+        self.assertEqual(self.client.get('/api/v1/cart/').data['lines'][0]['quantity'], 3)
+
+    def test_merge_adds_guest_quantities_to_the_saved_cart(self):
+        self.client.force_authenticate(self.user)
+        self.client.put('/api/v1/cart/', self.lines(1), format='json')
+        other = Product.objects.create(name='Ittar', slug='ittar', price_paise=24_900, inventory=9)
+        r = self.client.post('/api/v1/cart/merge/', {'lines': [{'productId': self.product.id, 'quantity': 1},
+                                                                  {'productId': other.id, 'quantity': 2}]}, format='json')
+        quantities = {line['productId']: line['quantity'] for line in r.data['lines']}
+        self.assertEqual(quantities, {self.product.id: 2, other.id: 2})
+
+    def test_carts_are_private_per_user(self):
+        self.client.force_authenticate(self.user)
+        self.client.put('/api/v1/cart/', self.lines(2), format='json')
+        other = get_user_model().objects.create_user('o@b.com', 'o@b.com', PASSWORD)
+        self.client.force_authenticate(other)
+        self.assertEqual(self.client.get('/api/v1/cart/').data['lines'], [])
+
+
+class CheckoutRetryTests(ShopTestCase):
+    def test_retrying_checkout_reuses_the_unpaid_order_and_does_not_reserve_twice(self):
+        first = self.place_order(qty=2)
+        self.assertEqual(first.status_code, 201)
+        # If a new Razorpay order were created it would be 'order_Z'; reuse must hand back the original.
+        second = self.place_order(qty=2, razorpay_id='order_Z')
+        self.assertEqual(second.status_code, 200, second.data)
+        self.assertTrue(second.data['reused'])
+        self.assertEqual(second.data['orderId'], first.data['orderId'])
+        self.assertEqual(second.data['razorpayOrderId'], 'order_X')
+        self.assertEqual(Order.objects.count(), 1)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.inventory, 1)  # reserved once, not twice
+
+    def test_retry_works_even_for_the_last_unit(self):
+        Product.objects.filter(pk=self.product.pk).update(inventory=1)
+        self.assertEqual(self.place_order(qty=1).status_code, 201)
+        self.assertEqual(self.place_order(qty=1).status_code, 200)  # would be 409 without reuse
+
+    def test_changing_the_cart_cancels_the_old_order_and_returns_its_stock(self):
+        first = self.place_order(qty=1)
+        second = self.place_order(qty=2, razorpay_id='order_Y')
+        self.assertEqual(second.status_code, 201, second.data)
+        self.assertNotEqual(second.data['orderId'], first.data['orderId'])
+        self.assertEqual(Order.objects.get(pk=first.data['orderId']).status, Order.Status.CANCELLED)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.inventory, 1)  # 3 - 2; the first reservation was released
+
+    def test_a_price_change_prevents_reuse(self):
+        first = self.place_order(qty=1)
+        Product.objects.filter(pk=self.product.pk).update(price_paise=39_900)
+        second = self.place_order(qty=1, razorpay_id='order_Y')
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(second.data['subtotal'], 39_900)
+        self.assertEqual(Order.objects.get(pk=first.data['orderId']).status, Order.Status.CANCELLED)
+
+    def test_paid_orders_are_never_reused_or_cancelled(self):
+        first = self.place_order(qty=1)
+        Order.objects.filter(pk=first.data['orderId']).update(status=Order.Status.PAID)
+        second = self.place_order(qty=1, razorpay_id='order_Y')
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(Order.objects.get(pk=first.data['orderId']).status, Order.Status.PAID)
+
+    def test_save_address_updates_the_profile(self):
+        self.place_order(saveAddress=True)
+        me = self.client.get('/api/v1/account/me/').data
+        self.assertEqual(me['address'], {'address': '1 Seva Kunj', 'city': 'Vrindavan', 'state': 'UP', 'postalCode': '281121'})
+        self.assertEqual(me['phone'], '9999999999')
+
+    def test_address_is_not_saved_unless_asked(self):
+        self.place_order()
+        self.assertIsNone(self.client.get('/api/v1/account/me/').data['address'])
+
+
+class OrderHistoryTests(ShopTestCase):
+    def test_history_lists_own_orders_newest_first_with_lines_and_address(self):
+        self.place_order(qty=1)
+        Order.objects.update(status=Order.Status.PAID)
+        self.place_order(qty=2, razorpay_id='order_Y')
+        r = self.client.get('/api/v1/orders/')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.data), 2)
+        newest = r.data[0]
+        self.assertEqual(newest['lines'][0]['quantity'], 2)
+        self.assertEqual(newest['lines'][0]['name'], 'Mala')
+        self.assertEqual(newest['shippingAddress']['city'], 'Vrindavan')
+
+    def test_history_excludes_other_customers_orders(self):
+        self.place_order()
+        other = get_user_model().objects.create_user('o@b.com', 'o@b.com', PASSWORD)
+        self.client.force_authenticate(other)
+        self.assertEqual(self.client.get('/api/v1/orders/').data, [])
+
+    def test_history_requires_auth(self):
+        self.assertEqual(self.client.get('/api/v1/orders/').status_code, 401)
+
+
+class SeedCatalogTests(ShopTestCase):
+    def test_seed_is_idempotent_and_hides_the_packing_sku(self):
+        call_command('seed_catalog', stdout=StringIO())
+        count = Product.objects.count()
+        call_command('seed_catalog', stdout=StringIO())
+        self.assertEqual(Product.objects.count(), count)
+        packing = Product.objects.get(slug='seva-box-packing')
+        self.assertFalse(packing.listed)
+        self.assertEqual(packing.price_paise, 14_900)
+        listed = [p['slug'] for p in self.client.get('/api/v1/products/').data]
+        self.assertNotIn('seva-box-packing', listed)
+        self.assertIn('tulsi-japa-mala', listed)

@@ -1,2 +1,5 @@
-import { AccountPage } from '@/components/site-pages'
-export default function Page() { return <AccountPage /> }
+import { AccountPages } from '@/components/account-pages'
+
+export default function Page() {
+  return <AccountPages section="overview" />
+}

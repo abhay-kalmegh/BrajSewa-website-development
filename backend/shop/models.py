@@ -28,13 +28,16 @@ class Product(models.Model):
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
     category = models.CharField(max_length=80, db_index=True, default='General')
-    image_url = models.URLField(blank=True)
+    image_url = models.CharField(max_length=500, blank=True)  # absolute CDN URL or site path like /hero.webp
     price_paise = models.PositiveIntegerField()
     compare_at_price_paise = models.PositiveIntegerField(null=True, blank=True)
     inventory = models.PositiveIntegerField(default=0)
     active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    badge = models.CharField(max_length=40, blank=True)  # e.g. "Bestseller"
+    details = models.JSONField(default=list, blank=True)  # bullet points shown on the product page
+    listed = models.BooleanField(default=True)  # False = purchasable by slug but hidden from listings
 
     class Meta:
         ordering = ['sort_order', '-created_at']
@@ -87,3 +90,18 @@ class OrderLine(models.Model):
     product_name = models.CharField(max_length=180, blank=True)  # snapshot at purchase time
     quantity = models.PositiveIntegerField()
     unit_price_paise = models.PositiveIntegerField()
+
+
+class Cart(models.Model):
+    """A signed-in customer's saved cart, so it follows them across devices."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='cart', on_delete=models.CASCADE)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class CartItem(models.Model):
+    cart = models.ForeignKey(Cart, related_name='items', on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['cart', 'product'], name='cartitem_unique_product')]

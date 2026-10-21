@@ -3,17 +3,17 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Order, Product
+from .models import Order, OrderLine, Product
 
 
 class ProductSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField()
     compareAtPrice = serializers.SerializerMethodField()
-    image = serializers.URLField(source='image_url', read_only=True)
+    image = serializers.CharField(source='image_url', read_only=True)
 
     class Meta:
         model = Product
-        fields = ['id', 'name', 'slug', 'description', 'category', 'image', 'price', 'compareAtPrice', 'inventory', 'active']
+        fields = ['id', 'name', 'slug', 'description', 'category', 'image', 'badge', 'details', 'price', 'compareAtPrice', 'inventory', 'active']
 
     def get_price(self, obj):
         return obj.price_paise / 100
@@ -33,7 +33,7 @@ class SellerProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ['id', 'name', 'slug', 'description', 'category', 'image_url',
+        fields = ['id', 'name', 'slug', 'description', 'category', 'image_url', 'badge', 'details',
                   'price_paise', 'compare_at_price_paise', 'inventory', 'active']
 
 
@@ -58,16 +58,43 @@ class CustomerSerializer(serializers.Serializer):
 class CreateOrderSerializer(serializers.Serializer):
     customer = CustomerSerializer()
     lines = OrderLineInputSerializer(many=True, allow_empty=False, max_length=50)
+    saveAddress = serializers.BooleanField(required=False, default=False)
+
+
+class CartLinesSerializer(serializers.Serializer):
+    """Body for the cart endpoints: just product ids and quantities. Prices always come from the server."""
+    lines = OrderLineInputSerializer(many=True, allow_empty=True, max_length=50)
+
+
+class OrderLineSerializer(serializers.ModelSerializer):
+    productId = serializers.IntegerField(source='product_id')
+    slug = serializers.CharField(source='product.slug')
+    name = serializers.SerializerMethodField()
+    image = serializers.CharField(source='product.image_url')
+    unitPrice = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderLine
+        fields = ['productId', 'slug', 'name', 'image', 'quantity', 'unitPrice']
+
+    def get_name(self, obj):
+        return obj.product_name or obj.product.name
+
+    def get_unitPrice(self, obj):
+        return obj.unit_price_paise / 100
 
 
 class OrderSerializer(serializers.ModelSerializer):
     total = serializers.SerializerMethodField()
     subtotal = serializers.SerializerMethodField()
     shipping = serializers.SerializerMethodField()
+    lines = OrderLineSerializer(many=True, read_only=True)
+    shippingAddress = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
-        fields = ['id', 'status', 'subtotal', 'shipping', 'total', 'razorpay_order_id', 'paid_at', 'created_at']
+        fields = ['id', 'status', 'subtotal', 'shipping', 'total', 'razorpay_order_id', 'paid_at', 'created_at',
+                  'lines', 'shippingAddress']
 
     def get_total(self, obj):
         return obj.total_paise / 100
@@ -77,6 +104,10 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def get_shipping(self, obj):
         return obj.shipping_paise / 100
+
+    def get_shippingAddress(self, obj):
+        return {'name': f'{obj.first_name} {obj.last_name}'.strip(), 'phone': obj.phone, 'email': obj.email,
+                'address': obj.address, 'city': obj.city, 'state': obj.state, 'postalCode': obj.postal_code}
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -108,9 +139,27 @@ class ProfileSerializer(serializers.Serializer):
     email = serializers.EmailField()
     role = serializers.SerializerMethodField()
     name = serializers.SerializerMethodField()
+    firstName = serializers.CharField(source='first_name')
+    lastName = serializers.CharField(source='last_name')
+    phone = serializers.SerializerMethodField()
+    address = serializers.SerializerMethodField()
 
     def get_role(self, obj):
         return 'seller' if hasattr(obj, 'seller_profile') else 'buyer'
 
     def get_name(self, obj):
         return obj.get_full_name() or obj.email
+
+    def _buyer(self, obj):
+        return getattr(obj, 'buyer_profile', None)
+
+    def get_phone(self, obj):
+        buyer = self._buyer(obj)
+        return buyer.phone if buyer else ''
+
+    def get_address(self, obj):
+        """Saved delivery address, or null if the customer hasn't saved one."""
+        buyer = self._buyer(obj)
+        if not buyer or not buyer.address:
+            return None
+        return {'address': buyer.address, 'city': buyer.city, 'state': buyer.state, 'postalCode': buyer.postal_code}

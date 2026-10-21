@@ -8,7 +8,9 @@ Owns catalog data, customer accounts, orders, and Razorpay payment verification.
 2. Set the variables from the project `.env.example` (at minimum `DJANGO_SECRET_KEY` and the `POSTGRES_*` values).
    For plain-HTTP local work also set `DJANGO_DEBUG=true` or `DJANGO_HTTPS_ONLY=false`.
 3. `python manage.py migrate`, `python manage.py createsuperuser`, `python manage.py runserver`.
-4. Add products at `/admin/` (path configurable with `DJANGO_ADMIN_PATH`).
+4. Load the demo catalogue with `python manage.py seed_catalog` (safe to re-run), or add products at `/admin/`
+   (path configurable with `DJANGO_ADMIN_PATH`). The seed data is placeholder content: replace names, prices,
+   photos and stock with your real catalogue before launch.
 
 Tests: `DJANGO_HTTPS_ONLY=false python manage.py test` (needs Postgres, same env vars as above).
 
