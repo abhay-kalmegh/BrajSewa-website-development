@@ -127,5 +127,31 @@ class RazorpayKeyModeTests(unittest.TestCase):
         self.assertEqual(code, 0, err)
 
 
+
+class DatabaseSettingsTests(unittest.TestCase):
+    def test_connections_are_reused_and_health_checked(self):
+        code, out, err = load_settings(expr="(s.DATABASES['default']['CONN_MAX_AGE'], s.DATABASES['default']['CONN_HEALTH_CHECKS'])")
+        self.assertEqual((code, out), (0, '(60, True)'), err)
+
+    def test_connection_lifetime_is_configurable(self):
+        code, out, err = load_settings({'DB_CONN_MAX_AGE': '0'}, expr="s.DATABASES['default']['CONN_MAX_AGE']")
+        self.assertEqual((code, out), (0, '0'), err)
+
+    def test_connect_timeout_is_bounded(self):
+        code, out, err = load_settings(expr="s.DATABASES['default']['OPTIONS']['connect_timeout']")
+        self.assertEqual((code, out), (0, '5'), err)
+
+    def test_require_tls_is_applied_and_quiet(self):
+        code, out, err = load_settings({'POSTGRES_SSLMODE': 'require'}, expr="s.DATABASES['default']['OPTIONS']['sslmode']")
+        self.assertEqual((code, out), (0, 'require'), err)
+        self.assertNotIn('POSTGRES_SSLMODE', err)
+
+    def test_weak_sslmode_in_production_warns(self):
+        for mode in ('disable', 'allow', 'prefer'):
+            code, _, err = load_settings({'POSTGRES_SSLMODE': mode})
+            self.assertEqual(code, 0, err)
+            self.assertIn('database traffic may be unencrypted', err, mode)
+
+
 if __name__ == '__main__':
     unittest.main()

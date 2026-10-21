@@ -55,9 +55,19 @@ TEMPLATES = [{'BACKEND': 'django.template.backends.django.DjangoTemplates', 'DIR
                                                  'django.contrib.auth.context_processors.auth',
                                                  'django.contrib.messages.context_processors.messages']}}]
 WSGI_APPLICATION = 'config.wsgi.application'
-DATABASES = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('POSTGRES_DB', ''),
-                         'USER': os.getenv('POSTGRES_USER', ''), 'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
-                         'HOST': os.getenv('POSTGRES_HOST', ''), 'PORT': os.getenv('POSTGRES_PORT', '5432')}}
+POSTGRES_SSLMODE = os.getenv('POSTGRES_SSLMODE', 'prefer')
+DATABASES = {'default': {
+    'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('POSTGRES_DB', ''),
+    'USER': os.getenv('POSTGRES_USER', ''), 'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
+    'HOST': os.getenv('POSTGRES_HOST', ''), 'PORT': os.getenv('POSTGRES_PORT', '5432'),
+    # Without CONN_MAX_AGE Django opens (and closes) a new PostgreSQL connection for EVERY request.
+    'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '60')),
+    'CONN_HEALTH_CHECKS': True,      # discard a connection that died (e.g. after an RDS failover) instead of erroring
+    'OPTIONS': {'sslmode': POSTGRES_SSLMODE, 'connect_timeout': 5},
+}}
+if not DEBUG and POSTGRES_SSLMODE in ('disable', 'allow', 'prefer'):
+    warnings.warn(f'POSTGRES_SSLMODE={POSTGRES_SSLMODE!r}: database traffic may be unencrypted. Use "require" (or '
+                  '"verify-full") against RDS or any database not on a private single-host network.', RuntimeWarning)
 
 # Authentication ------------------------------------------------------------------------------
 AUTH_PASSWORD_VALIDATORS = [

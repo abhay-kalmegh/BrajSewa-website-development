@@ -46,6 +46,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
+      POSTGRES_SSLMODE: ${POSTGRES_SSLMODE:-prefer}
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
@@ -65,7 +66,12 @@ services:
     build:
       context: ./backend
     restart: "no"
-    environment: *backend_env
+    environment:
+      <<: *backend_env
+      # Migrations run as the schema OWNER (DDL); the web process uses the lower-privileged app role.
+      # If MIGRATE_* are unset they fall back to the app role, which is fine for local development only.
+      POSTGRES_USER: ${MIGRATE_POSTGRES_USER:-${POSTGRES_USER:-brajsewa}}
+      POSTGRES_PASSWORD: ${MIGRATE_POSTGRES_PASSWORD:-${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}}
     command: ["python", "manage.py", "migrate", "--noinput"]
     healthcheck:
       disable: true   # not a server
