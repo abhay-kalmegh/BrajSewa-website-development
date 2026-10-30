@@ -241,21 +241,68 @@ class InventoryRestorationTests(ShopTestCase):
         self.assertEqual(order.status, Order.Status.EXPIRED)
         self.assertEqual(self.product.inventory, 3)
 
+    
     def test_recent_and_paid_orders_are_left_alone(self):
+        # First customer: recent pending order
         self.place_order()
         recent = Order.objects.get()
         self.age(recent, 5)
-        other = Product.objects.create(name='Other Product', slug='other-product', price_paise=1000,
-                                       inventory=1, active=True)
-        self.place_order(lines=[{'productId': other.id, 'quantity': 1}], razorpay_id='order_Y')
-        paid = Order.objects.exclude(pk=recent.pk).get()
+
+        other = Product.objects.create(
+            name='Other Product',
+            slug='other-product',
+            price_paise=1000,
+            inventory=1,
+            active=True
+        )
+
+        # Second customer: independent paid order
+        other_user = get_user_model().objects.create_user(
+            'paid@b.com', 'paid@b.com', PASSWORD
+        )
+        self.client.force_authenticate(other_user)
+
+        body = {
+            'customer': CUSTOMER,
+            'lines': [{'productId': other.id, 'quantity': 1}]
+        }
+
+        with patch('shop.views.razorpay.Client') as client:
+            client.return_value.order.create.return_value = {'id': 'order_Y'}
+            response = self.client.post(
+                '/api/v1/orders/', body, format='json'
+            )
+
+        self.assertEqual(response.status_code, 201, response.data)
+
+        paid = Order.objects.get(user=other_user)
         Order.objects.filter(pk=paid.pk).update(status=Order.Status.PAID)
         self.age(paid, 120)
+
         self.assertIn('Expired 0', self.run_expiry())
+
         self.product.refresh_from_db()
         other.refresh_from_db()
+
         self.assertEqual(self.product.inventory, 2)
-        self.assertEqual(other.inventory, 1)
+        self.assertEqual(other.inventory, 0)
+
+
+    # def test_recent_and_paid_orders_are_left_alone(self):
+    #     self.place_order()
+    #     recent = Order.objects.get()
+    #     self.age(recent, 5)
+    #     other = Product.objects.create(name='Other Product', slug='other-product', price_paise=1000,
+    #                                    inventory=1, active=True)
+    #     self.place_order(lines=[{'productId': other.id, 'quantity': 1}], razorpay_id='order_Y')
+    #     paid = Order.objects.exclude(pk=recent.pk).get()
+    #     Order.objects.filter(pk=paid.pk).update(status=Order.Status.PAID)
+    #     self.age(paid, 120)
+    #     self.assertIn('Expired 0', self.run_expiry())
+    #     self.product.refresh_from_db()
+    #     other.refresh_from_db()
+    #     self.assertEqual(self.product.inventory, 2)
+    #     self.assertEqual(other.inventory, 1)
 
     def test_expiry_is_idempotent(self):
         self.place_order()
