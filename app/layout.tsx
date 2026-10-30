@@ -1,6 +1,7 @@
-import { Analytics } from '@vercel/analytics/next'
+import { SafeAnalytics } from '@/components/safe-analytics'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { AuthProvider } from '@/lib/auth'
 import { CartProvider } from '@/lib/cart'
 
 export const metadata: Metadata = {
@@ -13,11 +14,11 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/brajsewa-logo.png',
+        url: '/icon-192.png',
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/brajsewa-logo.png',
+        url: '/icon-192.png',
         media: '(prefers-color-scheme: dark)',
       },
       {
@@ -45,8 +46,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <CartProvider>{children}</CartProvider>
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        <AuthProvider>
+          <CartProvider>{children}</CartProvider>
+        </AuthProvider>
+        <SafeAnalytics />
       </body>
     </html>
   )

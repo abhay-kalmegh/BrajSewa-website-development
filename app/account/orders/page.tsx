@@ -1,5 +1,5 @@
-import { AccountPage } from '@/components/site-pages'
+import { AccountPages } from '@/components/account-pages'
 
 export default function Page() {
-  return <AccountPage section="orders" />
+  return <AccountPages section="orders" />
 }

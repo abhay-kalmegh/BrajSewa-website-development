@@ -6,8 +6,15 @@ __v0_jsx-dev-runtime.ts
 .v0-trash/
 .vercel/
 
-# Environment variables
-.env*.local
+# Python bytecode (created by every test run; once slipped into the history of this series)
+__pycache__/
+*.pyc
+
+# Environment files: ignore every real one, re-allow only the committed templates
+.env
+.env.*
+!.env.example
+!.env.local.example
 
 # Common ignores
 node_modules

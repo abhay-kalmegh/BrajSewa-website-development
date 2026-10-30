@@ -1,2 +1,6 @@
-import { ReviewOrderPage } from '@/components/review-order-page'
-export default function Page() { return <ReviewOrderPage /> }
+import { redirect } from 'next/navigation'
+
+// The four-step prototype was replaced by a single /checkout page. Keep old links working.
+export default function Page() {
+  redirect('/checkout')
+}

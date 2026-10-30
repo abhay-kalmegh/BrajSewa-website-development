@@ -1,35 +1,31 @@
-'use client'
-
 import Link from 'next/link'
-import { use, useMemo, useState } from 'react'
-import { ArrowLeft, Check, Heart, Minus, Plus, ShoppingBag, Star, Truck } from 'lucide-react'
-import { useCart } from '@/lib/cart'
+import type { Metadata } from 'next'
+import { ProductDetail } from '@/components/product-detail'
+import { getProduct } from '@/lib/api/catalog'
 
-const products = [
-  { name: 'Tulsi Japa Mala', slug: 'tulsi-japa-mala', category: 'Naam Jap', price: 299, oldPrice: 399, stock: 12, image: 'https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=1000&q=85', rating: '4.9', reviews: 48, description: 'A serene Tulsi mala for daily naam jap, prayer, and mindful pauses throughout your day.', details: ['108 Tulsi beads plus guru bead', 'Hand-finished for comfortable daily use', 'Keep dry and store in the included cotton pouch'] },
-  { name: 'Naam Jap Counter', slug: 'naam-jap-counter', category: 'Naam Jap', price: 299, oldPrice: 349, stock: 8, image: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=1000&q=85', rating: '4.8', reviews: 31, description: 'A tactile counter to help you keep your practice steady, focused, and peaceful.', details: ['Easy thumb counter', 'Lightweight devotional companion', 'Designed for everyday repetition practice'] },
-  { name: 'Mogra Ittar', slug: 'mogra-ittar', category: 'Ittar & Sugandh', price: 249, oldPrice: 299, stock: 16, image: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=1000&q=85', rating: '4.7', reviews: 26, imageAlt: 'Mogra fragrance bottle', description: 'A soft floral fragrance that brings a gentle, welcoming atmosphere to your seva space.', details: ['Concentrated roll-on fragrance', 'Use sparingly on pulse points', 'Keep away from direct sunlight'] },
-  { name: 'Handmade Mala Jholi', slug: 'handmade-mala-jholi', category: 'Naam Jap', price: 199, oldPrice: 249, stock: 5, image: 'https://images.unsplash.com/photo-1604881988758-f76ad2f7aac1?auto=format&fit=crop&w=1000&q=85', rating: '4.9', reviews: 19, description: 'A handmade jholi that keeps your mala protected while you move through your daily practice.', details: ['Soft cotton construction', 'Comfortable shoulder cord', 'Made for one standard mala'] },
-  { name: 'Braj Chandan', slug: 'braj-chandan', category: 'Pooja Essentials', price: 149, oldPrice: 199, stock: 24, image: 'https://images.unsplash.com/photo-1604608672516-f1b9e0e0b5ae?auto=format&fit=crop&w=1000&q=85', rating: '4.8', reviews: 37, description: 'A simple chandan essential for your daily tilak, offering, and prayer routine.', details: ['Smooth sandalwood paste', 'Suitable for daily pooja', 'Store sealed in a cool, dry place'] },
-  { name: 'Rose Dhoop Cones', slug: 'rose-dhoop-cones', category: 'Incense & Dhoop', price: 179, oldPrice: 229, stock: 18, image: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=1000&q=85', rating: '4.6', reviews: 22, description: 'Rose-scented dhoop cones for creating a calm, fragrant devotional atmosphere.', details: ['Slow-burning cones', 'Rose fragrance', 'Use on a heat-safe surface with ventilation'] },
-  { name: 'Braj Seva Gift Box', slug: 'braj-seva-gift-box', category: 'Seva Boxes', price: 799, oldPrice: 999, stock: 6, image: '/braj-seva-hero.png', rating: '5.0', reviews: 12, description: 'A thoughtful collection of Braj-inspired essentials, packed with care for gifting or seva.', details: ['Curated devotional assortment', 'Gift-ready presentation', 'Packed with care from Braj'] },
-  { name: 'Sandal Ittar', slug: 'sandal-ittar', category: 'Ittar & Sugandh', price: 249, oldPrice: 299, stock: 10, image: 'https://images.unsplash.com/photo-1615634260167-c8cdedd30a1a?auto=format&fit=crop&w=1000&q=85', rating: '4.8', reviews: 18, description: 'A warm sandal fragrance for quiet evenings, offerings, and everyday moments of calm.', details: ['Concentrated roll-on fragrance', 'Warm sandalwood profile', 'Keep away from direct sunlight'] },
-]
+export const dynamic = 'force-dynamic'
 
-export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params)
-  const product = products.find((item) => item.slug === slug)
-  if (!product) return <main className="grid min-h-screen place-items-center bg-[#fff9f0] px-5 text-center"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#d66a83]">Product not found</p><h1 className="mt-3 font-serif text-5xl">This seva item has moved.</h1><Link href="/shop" className="mt-8 inline-flex rounded-full bg-[#d99a2b] px-6 py-3 font-bold text-white">Return to shop</Link></div></main>
-  return <ProductDetail product={product} />
+type Params = { params: Promise<{ slug: string }> }
+
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const product = await getProduct((await params).slug).catch(() => null)
+  return product
+    ? { title: `${product.name} · BrajSewa.com`, description: product.description, openGraph: { images: product.image.startsWith('http') ? [product.image] : undefined } }
+    : { title: 'Product not found · BrajSewa.com' }
 }
 
-function ProductDetail({ product }: { product: typeof products[number] }) {
-  const [quantity, setQuantity] = useState(1)
-  const [liked, setLiked] = useState(false)
-  const [added, setAdded] = useState(false)
-  const { addItem } = useCart()
-  const addToCart = () => { addItem({ id: product.slug, name: product.name, price: product.price, image: product.image }, quantity); setAdded(true) }
-  const buyNow = () => { addToCart(); window.location.href = '/checkout/information' }
-  const total = useMemo(() => product.price * quantity, [product.price, quantity])
-  return <main className="min-h-screen bg-[#fff9f0] text-[#24201d]"><header className="border-b border-[#24201d]/10 bg-white/80"><div className="mx-auto max-w-7xl px-5 py-5 lg:px-8"><Link href="/shop" className="inline-flex items-center gap-2 text-sm font-semibold text-[#667a52]"><ArrowLeft className="size-4" /> Back to shop</Link></div></header><div className="mx-auto max-w-7xl px-5 py-8 pb-24 lg:px-8 lg:py-12"><nav className="mb-8 text-sm text-[#24201d]/50"><Link href="/">Home</Link><span className="px-2">/</span><Link href="/shop">Shop</Link><span className="px-2">/</span><span>{product.name}</span></nav><div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16"><div><div className="aspect-square overflow-hidden rounded-3xl bg-[#f3e4c9]"><img src={product.image} alt={product.imageAlt ?? product.name} className="h-full w-full object-cover" /></div><div className="mt-4 grid grid-cols-4 gap-3"><button type="button" className="aspect-square overflow-hidden rounded-xl ring-2 ring-[#d99a2b]"><img src={product.image} alt="" className="h-full w-full object-cover" /></button></div></div><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#d66a83]">{product.category}</p><h1 className="mt-3 font-serif text-5xl leading-[0.95] sm:text-6xl">{product.name}</h1><div className="mt-5 flex items-center gap-3"><span className="inline-flex items-center gap-1 rounded-full bg-[#e4eedb] px-3 py-1 text-sm font-bold text-[#667a52]"><Star className="size-4 fill-current" /> {product.rating}</span><span className="text-sm text-[#24201d]/55">{product.reviews} verified reviews</span></div><div className="mt-6 flex items-baseline gap-3"><span className="text-3xl font-bold">₹{product.price.toLocaleString('en-IN')}</span><span className="text-lg text-[#24201d]/40 line-through">₹{product.oldPrice.toLocaleString('en-IN')}</span><span className="text-sm font-bold text-[#d66a83]">Save ₹{product.oldPrice - product.price}</span></div><p className="mt-6 text-base leading-8 text-[#24201d]/70">{product.description}</p><div className="mt-6 flex items-center gap-2 text-sm font-semibold text-[#667a52]"><Check className="size-5" /> In stock · {product.stock} available</div><div className="mt-8 flex flex-wrap items-center gap-3"><div className="flex items-center rounded-full border border-[#24201d]/15 bg-white"><button type="button" aria-label="Decrease quantity" disabled={quantity === 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))} className="grid size-12 place-items-center disabled:opacity-30"><Minus className="size-4" /></button><span className="w-8 text-center font-bold">{quantity}</span><button type="button" aria-label="Increase quantity" disabled={quantity >= product.stock} onClick={() => setQuantity((value) => Math.min(product.stock, value + 1))} className="grid size-12 place-items-center disabled:opacity-30"><Plus className="size-4" /></button></div><button type="button" onClick={() => addToCart()} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-[#d99a2b] px-6 font-bold text-white hover:bg-[#c8891e]"><ShoppingBag className="size-4" /> {added ? `Added · ₹${total.toLocaleString('en-IN')}` : 'Add to cart'}</button><button type="button" onClick={() => setLiked((value) => !value)} aria-label={liked ? 'Remove from wishlist' : 'Add to wishlist'} className={`grid size-12 place-items-center rounded-full border ${liked ? 'border-[#d66a83] bg-[#fff0f2] text-[#d66a83]' : 'border-[#24201d]/15 bg-white'}`}><Heart className={`size-5 ${liked ? 'fill-current' : ''}`} /></button></div><button type="button" onClick={() => addToCart()} className="mt-3 min-h-12 w-full rounded-full border border-[#667a52] font-bold text-[#667a52]" onClick={buyNow}>Buy now</button><div className="mt-8 grid gap-3 border-t border-[#24201d]/10 pt-6 sm:grid-cols-2"><div className="flex gap-3"><Truck className="mt-1 size-5 text-[#667a52]" /><p className="text-sm leading-6"><strong>Careful delivery</strong><br /><span className="text-[#24201d]/55">Packed thoughtfully for your home.</span></p></div><div className="flex gap-3"><Check className="mt-1 size-5 text-[#667a52]" /><p className="text-sm leading-6"><strong>Easy support</strong><br /><span className="text-[#24201d]/55">We’re here if you need us.</span></p></div></div></div></div><section className="mt-16 grid gap-8 border-t border-[#24201d]/10 pt-10 lg:grid-cols-2"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#d66a83]">Product details</p><h2 className="mt-2 font-serif text-3xl">Made for your daily ritual.</h2><ul className="mt-6 grid gap-3">{product.details.map((detail) => <li key={detail} className="flex gap-3 text-sm leading-6 text-[#24201d]/70"><Check className="mt-1 size-4 shrink-0 text-[#667a52]" />{detail}</li>)}</ul></div><div className="rounded-2xl bg-white p-6"><h2 className="font-serif text-2xl">Shipping & returns</h2><p className="mt-3 text-sm leading-7 text-[#24201d]/65">Your order is carefully packed and dispatched with tracking. If something arrives damaged, contact us and we’ll make it right.</p><Link href="/shipping" className="mt-5 inline-block text-sm font-bold text-[#667a52]">Read delivery details <ArrowLeft className="ml-1 inline size-4 rotate-180" /></Link></div></section></div></main>
+export default async function ProductPage({ params }: Params) {
+  const product = await getProduct((await params).slug)
+  if (!product) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#fff9f0] px-5 text-center">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#d66a83]">Product not found</p>
+          <h1 className="mt-3 font-serif text-5xl">This seva item has moved.</h1>
+          <Link href="/shop" className="mt-8 inline-flex rounded-full bg-[#d99a2b] px-6 py-3 font-bold text-white">Return to shop</Link>
+        </div>
+      </main>
+    )
+  }
+  return <ProductDetail product={product} />
 }
