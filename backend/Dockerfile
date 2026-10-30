@@ -5,7 +5,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 # Build-time only secret: collectstatic needs settings to import, not a real key.
-RUN DJANGO_SECRET_KEY='build-only-static-key-8b2f6a9c4d7e1f3a5c9b2d6e8f4a7c1e' python manage.py collectstatic --noinput
+RUN DJANGO_SECRET_KEY='build-only-static-key-8b2f6a9c4d7e1f3a5c9b2d6e8f4a7c1e' \
+  JWT_SIGNING_KEY='build-only-jwt-key-3f7a9c2e6b8d1f4a7c9e2b5d8f1a4c7e' \
+  python manage.py collectstatic --noinput
 RUN useradd --system --uid 1001 app && chown -R app /app
 USER app
 EXPOSE 8000
