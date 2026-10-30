@@ -15,7 +15,7 @@ jobs:
   secret-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0                 # scan the whole history, not just the tip
       - run: pip install pyyaml
@@ -28,7 +28,7 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4          # version comes from "packageManager" in package.json
       - uses: actions/setup-node@v4
         with:
@@ -69,7 +69,7 @@ jobs:
       POSTGRES_PASSWORD: test
       POSTGRES_HOST: localhost
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -83,7 +83,7 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Scan dependencies, configuration and secrets in the source tree
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -102,7 +102,7 @@ jobs:
           - { name: web, context: ., file: Dockerfile }
           - { name: api, context: backend, file: backend/Dockerfile }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
