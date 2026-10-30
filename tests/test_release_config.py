@@ -79,6 +79,17 @@ class ReleaseConfigTests(unittest.TestCase):
         self.assertEqual(len(pins), 1, 'razorpay imports pkg_resources: setuptools must be declared')
         self.assertRegex(pins[0], r'<\s*81', 'pkg_resources is gone from setuptools 81 and later')
 
+    def test_security_scanner_action_uses_an_existing_v_prefixed_tag(self):
+        # After a supply-chain attack in March 2026 the Trivy action's maintainers renamed every tag to start with "v";
+        # a reference such as @0.28.0 no longer resolves and the whole job fails before it starts.
+        refs = []
+        for path in ('.github/workflows/ci.yml',):
+            with open(path) as handle:
+                refs += re.findall(r'aquasecurity/trivy-action@(\S+)', handle.read())
+        self.assertTrue(refs, 'the workflow should still scan with trivy')
+        for ref in refs:
+            self.assertRegex(ref, r'^(v\d+\.\d+\.\d+|[0-9a-f]{40})$', f'unresolvable or unpinned reference: {ref}')
+
     def test_only_one_service_migrates(self):
         migrating = [n for n, s in compose().items() if 'migrate' in json.dumps(s.get('command', ''))]
         self.assertEqual(migrating, ['migrate'])
