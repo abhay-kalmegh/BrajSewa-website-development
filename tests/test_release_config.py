@@ -71,6 +71,14 @@ class ReleaseConfigTests(unittest.TestCase):
         self.assertEqual(services['backend']['environment']['JWT_REFRESH_DAYS'], '${SESSION_REFRESH_DAYS:-3}')
         self.assertEqual(services['frontend']['environment']['AUTH_REFRESH_DAYS'], '${SESSION_REFRESH_DAYS:-3}')
 
+    def test_razorpay_sdk_has_the_setuptools_it_secretly_needs(self):
+        with open('backend/requirements.txt') as handle:
+            lines = [l.strip() for l in handle if l.strip() and not l.startswith('#')]
+        self.assertTrue(any(l.startswith('razorpay') for l in lines))
+        pins = [l for l in lines if l.startswith('setuptools')]
+        self.assertEqual(len(pins), 1, 'razorpay imports pkg_resources: setuptools must be declared')
+        self.assertRegex(pins[0], r'<\s*81', 'pkg_resources is gone from setuptools 81 and later')
+
     def test_only_one_service_migrates(self):
         migrating = [n for n, s in compose().items() if 'migrate' in json.dumps(s.get('command', ''))]
         self.assertEqual(migrating, ['migrate'])
