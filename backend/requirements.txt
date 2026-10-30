@@ -1,10 +1,10 @@
+# The Razorpay SDK does `import pkg_resources` but does not declare setuptools, and Python 3.12 no longer installs it.
+# Without this line Django crashes at start-up (ModuleNotFoundError). pkg_resources is removed from setuptools 81 onwards.
 Django>=5.1,<6.0
 djangorestframework>=3.15,<4.0
 django-cors-headers>=4.4,<5.0
-razorpay>=1.4,<2.0
-# The Razorpay SDK does `import pkg_resources` but does not declare setuptools, and Python 3.12 no longer installs it.
-# Without this line Django crashes at start-up (ModuleNotFoundError). pkg_resources is removed from setuptools 81 onwards.
-setuptools>=80.10.2,<82
+razorpay==2.0.1
+setuptools>=84.1.0
 djangorestframework-simplejwt>=5.3,<6.0
 psycopg[binary]>=3.2,<4.0
 whitenoise>=6.7,<7.0

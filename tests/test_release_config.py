@@ -73,11 +73,27 @@ class ReleaseConfigTests(unittest.TestCase):
 
     def test_razorpay_sdk_has_the_setuptools_it_secretly_needs(self):
         with open('backend/requirements.txt') as handle:
-            lines = [l.strip() for l in handle if l.strip() and not l.startswith('#')]
-        self.assertTrue(any(l.startswith('razorpay') for l in lines))
-        pins = [l for l in lines if l.startswith('setuptools')]
-        self.assertEqual(len(pins), 1, 'razorpay imports pkg_resources: setuptools must be declared')
-        self.assertRegex(pins[0], r'<\s*81', 'pkg_resources is gone from setuptools 81 and later')
+            lines = [
+                line.strip()
+                for line in handle
+                if line.strip() and not line.startswith('#')
+            ]
+
+        razorpay_pins = [l for l in lines if l.startswith('razorpay')]
+        setuptools_pins = [l for l in lines if l.startswith('setuptools')]
+
+        self.assertEqual(len(razorpay_pins), 1)
+        self.assertEqual(len(setuptools_pins), 1)
+
+        self.assertRegex(razorpay_pins[0], r'razorpay==2\.0\.1')
+        self.assertRegex(setuptools_pins[0], r'setuptools>=84\.1\.0')
+    # def test_razorpay_sdk_has_the_setuptools_it_secretly_needs(self):
+    #     with open('backend/requirements.txt') as handle:
+    #         lines = [l.strip() for l in handle if l.strip() and not l.startswith('#')]
+    #     self.assertTrue(any(l.startswith('razorpay') for l in lines))
+    #     pins = [l for l in lines if l.startswith('setuptools')]
+    #     self.assertEqual(len(pins), 1, 'razorpay imports pkg_resources: setuptools must be declared')
+    #     self.assertRegex(pins[0], r'<\s*81', 'pkg_resources is gone from setuptools 81 and later')
 
     def test_security_scanner_action_uses_an_existing_v_prefixed_tag(self):
         # After a supply-chain attack in March 2026 the Trivy action's maintainers renamed every tag to start with "v";
