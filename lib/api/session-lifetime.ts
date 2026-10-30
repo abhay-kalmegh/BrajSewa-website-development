@@ -5,7 +5,7 @@
  *
  * Shorter is safer: a stolen refresh token stays useful until it expires. Three days is the default; 1 to 30 is accepted.
  */
-export function refreshMaxAgeSeconds(env: { AUTH_REFRESH_DAYS?: string }): number {
+export function refreshMaxAgeSeconds(env: Readonly<Record<string, string | undefined>>): number {   // accepts process.env as-is
   const raw = env.AUTH_REFRESH_DAYS ?? '3'
   const days = /^\d+$/.test(raw) ? Number(raw) : NaN
   if (!Number.isInteger(days) || days < 1 || days > 30) {

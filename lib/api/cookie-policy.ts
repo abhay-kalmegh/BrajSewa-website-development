@@ -5,11 +5,9 @@
  * acceptable only for local development, so in production it must be an explicit, deliberate opt-out
  * (ALLOW_INSECURE_COOKIES=true) rather than something a missing variable can cause.
  */
-export type CookieEnv = {
-  NODE_ENV?: string
-  AUTH_COOKIE_SECURE?: string
-  ALLOW_INSECURE_COOKIES?: string
-}
+// Any environment object. (A type listing only optional keys would reject `process.env`: TypeScript's weak-type
+// check refuses an object that shares no declared property with it.)
+export type CookieEnv = Readonly<Record<string, string | undefined>>
 
 export function resolveSecureCookies(env: CookieEnv): boolean {
   const production = env.NODE_ENV === 'production'
