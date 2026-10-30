@@ -245,13 +245,17 @@ class InventoryRestorationTests(ShopTestCase):
         self.place_order()
         recent = Order.objects.get()
         self.age(recent, 5)
-        self.place_order(razorpay_id='order_Y')
+        other = Product.objects.create(name='Other Product', slug='other-product', price_paise=1000,
+                                       inventory=1, active=True)
+        self.place_order(lines=[{'productId': other.id, 'quantity': 1}], razorpay_id='order_Y')
         paid = Order.objects.exclude(pk=recent.pk).get()
         Order.objects.filter(pk=paid.pk).update(status=Order.Status.PAID)
         self.age(paid, 120)
         self.assertIn('Expired 0', self.run_expiry())
         self.product.refresh_from_db()
-        self.assertEqual(self.product.inventory, 1)
+        other.refresh_from_db()
+        self.assertEqual(self.product.inventory, 2)
+        self.assertEqual(other.inventory, 1)
 
     def test_expiry_is_idempotent(self):
         self.place_order()
