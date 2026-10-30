@@ -138,7 +138,7 @@ class SellerProductListCreateView(generics.ListCreateAPIView):
         return Product.objects.filter(seller=self.request.user.seller_profile).order_by('-id')
 
     def perform_create(self, serializer):
-        seller = getattr(self.request.user, 'seller_profile', None)
+        seller = SellerProfile.objects.filter(user=self.request.user).first()
         if seller is None or not seller.approved:
             raise PermissionDenied('Seller approval is required before publishing products.')
         serializer.save(seller=seller)
