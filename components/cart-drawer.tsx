@@ -46,7 +46,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             <div className="flex flex-col gap-3">
               {items.map((item) => (
                 <div key={item.lineKey} className="flex gap-3 rounded-xl bg-white p-3">
-                  <Image src={item.image} alt="" width={64} height={64} sizes="64px" className="size-16 rounded-lg object-cover" />
+                  <Image src={typeof item.image === 'string' && item.image.trim() ? item.image : '/brajsewa-logo.webp'} alt="" width={64} height={64} sizes="64px" className="size-16 rounded-lg object-cover" />
                   <div className="flex-1">
                     <p className="font-serif text-lg">{item.name}</p>
                     <p className="text-sm text-[#667a52]">{formatRupees(item.price)} each</p>

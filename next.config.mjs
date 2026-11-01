@@ -22,6 +22,7 @@ const nextConfig = {
     remotePatterns: [
       // Only photo paths, so this server cannot be used as a free resizer for everything on the host.
       { protocol: 'https', hostname: 'images.unsplash.com', pathname: '/photo-*' },
+      { protocol: 'https', hostname: 'www.kelikunj.com', pathname: '/wp-content/uploads/**' },
       ...extraImageHosts.map((hostname) => ({ protocol: 'https', hostname })),
     ],
   },
