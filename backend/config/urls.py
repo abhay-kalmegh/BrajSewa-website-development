@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
+from django.conf.urls.static import static
 
 # /healthz/ and /readyz/ are answered by config.health.HealthCheckMiddleware (they must run before Host validation).
 urlpatterns = [
@@ -9,3 +10,9 @@ urlpatterns = [
     # (here and in shop.urls), so the unthrottled copy here always won.
     path('api/v1/', include('shop.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(
+        settings.MEDIA_URL,
+        document_root=settings.MEDIA_ROOT
+    )
