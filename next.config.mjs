@@ -8,6 +8,7 @@ const extraImageHosts = (process.env.IMAGE_HOSTS ?? '')
   .map((host) => host.trim())
   .filter(Boolean)
 
+
 const nextConfig = {
   // Type errors now fail the build (run `pnpm typecheck`). Never re-enable ignoreBuildErrors.
   output: 'standalone',
@@ -22,6 +23,19 @@ const nextConfig = {
     remotePatterns: [
       // Only photo paths, so this server cannot be used as a free resizer for everything on the host.
       { protocol: 'https', hostname: 'images.unsplash.com', pathname: '/photo-*' },
+       {
+        protocol: "http",
+        hostname: "localhost",
+        port: "8000",
+        pathname: "/media/**",
+      },
+      {
+        protocol: "http",
+        hostname: "127.0.0.1",
+        port: "8000",
+        pathname: "/media/**",
+      },
+      
       ...extraImageHosts.map((hostname) => ({ protocol: 'https', hostname })),
     ],
   },

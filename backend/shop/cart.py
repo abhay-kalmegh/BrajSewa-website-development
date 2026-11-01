@@ -41,7 +41,7 @@ def quote(wanted):
         allowed = min(requested, product.inventory, MAX_LINE_QUANTITY)
         issue = 'out_of_stock' if product.inventory == 0 else 'reduced' if allowed < requested else None
         subtotal += product.price_paise * allowed
-        lines.append({'productId': pid, 'slug': product.slug, 'name': product.name, 'image': product.image_url,
+        lines.append({'productId': pid, 'slug': product.slug, 'name': product.name, 'image': product.image.url if product.image else '',
                       'pricePaise': product.price_paise, 'quantity': allowed, 'requestedQuantity': requested,
                       'inventory': product.inventory, 'issue': issue})
     shipping = shipping_for(subtotal) if subtotal else 0

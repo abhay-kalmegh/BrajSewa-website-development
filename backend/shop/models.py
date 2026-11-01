@@ -23,30 +23,57 @@ class BuyerProfile(models.Model):
 
 
 class Product(models.Model):
-    seller = models.ForeignKey(SellerProfile, related_name='products', on_delete=models.PROTECT, null=True, blank=True)
+    seller = models.ForeignKey(
+        SellerProfile,
+        related_name='products',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
+
     name = models.CharField(max_length=180)
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
-    category = models.CharField(max_length=80, db_index=True, default='General')
+    category = models.CharField(
+        max_length=80,
+        db_index=True,
+        default='General',
+    )
+
+    # Uploaded image file
     image = models.ImageField(
-    upload_to="products/",
-    blank=True,
-    null=True
-)  # absolute CDN URL or site path like /hero.webp
+        upload_to='products/',
+        blank=True,
+        null=True,
+    )
+
+    # External HTTPS URL or local site path
+    image_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+    )
+
     price_paise = models.PositiveIntegerField()
-    compare_at_price_paise = models.PositiveIntegerField(null=True, blank=True)
+    compare_at_price_paise = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
     inventory = models.PositiveIntegerField(default=0)
     active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
-    badge = models.CharField(max_length=40, blank=True)  # e.g. "Bestseller"
-    details = models.JSONField(default=list, blank=True)  # bullet points shown on the product page
-    listed = models.BooleanField(default=True)  # False = purchasable by slug but hidden from listings
+    badge = models.CharField(max_length=40, blank=True)
+    details = models.JSONField(default=list, blank=True)
+    listed = models.BooleanField(default=True)
 
     class Meta:
         ordering = ['sort_order', '-created_at']
         constraints = [
-            models.CheckConstraint(condition=models.Q(price_paise__gt=0), name='product_price_positive'),
+            models.CheckConstraint(
+                condition=models.Q(price_paise__gt=0),
+                name='product_price_positive',
+            ),
         ]
 
     def __str__(self):

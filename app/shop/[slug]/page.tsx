@@ -10,7 +10,7 @@ type Params = { params: Promise<{ slug: string }> }
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const product = await getProduct((await params).slug).catch(() => null)
   return product
-    ? { title: `${product.name} · BrajSewa.com`, description: product.description, openGraph: { images: product.image.startsWith('http') ? [product.image] : undefined } }
+    ? { title: `${product.name} · BrajSewa.com`, description: product.description, openGraph: { images: typeof product.image === 'string' && product.image.startsWith('http') ? [product.image] : undefined } }
     : { title: 'Product not found · BrajSewa.com' }
 }
 

@@ -175,7 +175,7 @@ export function CheckoutPage() {
           <ul className="mt-5 grid gap-4">
             {items.map((item) => (
               <li key={item.lineKey} className="flex gap-3">
-                <Image src={item.image} alt="" width={56} height={56} sizes="56px" className="size-14 rounded-lg object-cover" />
+                <Image src={typeof item.image === 'string' && item.image.trim() ? item.image : '/brajsewa-logo.png'} alt="" width={56} height={56} sizes="56px" className="size-14 rounded-lg object-cover" />
                 <div className="min-w-0 flex-1 text-sm"><p className="font-semibold">{item.name}</p><p className="text-[#24201d]/60">Qty {item.quantity}</p></div>
                 <span className="text-sm font-semibold">{formatRupees(item.price * item.quantity)}</span>
               </li>
