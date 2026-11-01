@@ -2,10 +2,14 @@ import os
 import warnings
 from datetime import timedelta
 from pathlib import Path
-
 from django.core.exceptions import ImproperlyConfigured
-
 from config.logging_utils import logging_config
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load backend/.env
+load_dotenv(BASE_DIR / '.env')
 
 
 def env_bool(name, default):
@@ -62,9 +66,12 @@ TEMPLATES = [{'BACKEND': 'django.template.backends.django.DjangoTemplates', 'DIR
 WSGI_APPLICATION = 'config.wsgi.application'
 POSTGRES_SSLMODE = os.getenv('POSTGRES_SSLMODE', 'prefer')
 DATABASES = {'default': {
-    'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('POSTGRES_DB', ''),
-    'USER': os.getenv('POSTGRES_USER', ''), 'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
-    'HOST': os.getenv('POSTGRES_HOST', ''), 'PORT': os.getenv('POSTGRES_PORT', '5432'),
+    'ENGINE': 'django.db.backends.postgresql', 
+    'NAME': os.getenv('POSTGRES_DB', ''),
+    'USER': os.getenv('POSTGRES_USER', ''), 
+    'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
+    'HOST': os.getenv('POSTGRES_HOST', ''), 
+    'PORT': os.getenv('POSTGRES_PORT', '5432'),
     # Without CONN_MAX_AGE Django opens (and closes) a new PostgreSQL connection for EVERY request.
     'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '60')),
     'CONN_HEALTH_CHECKS': True,      # discard a connection that died (e.g. after an RDS failover) instead of erroring
