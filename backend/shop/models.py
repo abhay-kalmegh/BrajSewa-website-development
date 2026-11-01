@@ -28,7 +28,11 @@ class Product(models.Model):
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
     category = models.CharField(max_length=80, db_index=True, default='General')
-    image_url = models.CharField(max_length=500, blank=True)  # absolute CDN URL or site path like /hero.webp
+    image = models.ImageField(
+    upload_to="products/",
+    blank=True,
+    null=True
+)  # absolute CDN URL or site path like /hero.webp
     price_paise = models.PositiveIntegerField()
     compare_at_price_paise = models.PositiveIntegerField(null=True, blank=True)
     inventory = models.PositiveIntegerField(default=0)

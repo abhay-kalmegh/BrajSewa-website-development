@@ -197,3 +197,5 @@ if DEBUG and RAZORPAY_KEY_ID.startswith('rzp_live_'):
     raise ImproperlyConfigured('A Razorpay LIVE key is configured with DJANGO_DEBUG=true. Use test keys in development.')
 
 LOGGING = logging_config(os.getenv('LOG_LEVEL', 'INFO'))   # JSON lines with a request id, see config/logging_utils.py
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
