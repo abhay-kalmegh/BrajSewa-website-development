@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth'
 import { CartProvider } from '@/lib/cart'
+import { WishlistProvider } from '@/lib/wishlist'
 
 export const metadata: Metadata = {
   title: 'BrajSewa.com — Seva, Bhakti, Life',
@@ -47,7 +48,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased" suppressHydrationWarning>
         <AuthProvider>
-          <CartProvider>{children}</CartProvider>
+          <WishlistProvider><CartProvider>{children}</CartProvider></WishlistProvider>
         </AuthProvider>
         <SafeAnalytics />
       </body>
