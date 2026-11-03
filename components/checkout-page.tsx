@@ -67,7 +67,21 @@ export function CheckoutPage() {
         // If this call fails (network drop), the Razorpay webhook still marks the order paid and the
         // order page keeps checking, so we continue either way.
         setStage('confirming')
-        try { await verifyPayment(response) } catch { /* webhook is the backstop */ }
+        try {
+          const result = await verifyPayment(response)
+          if (result.status !== 'paid' && result.status !== 'verified') {
+            setStage('idle')
+            setError('Payment was received but is still being confirmed. Your cart is preserved while we check the order.')
+            router.push(`/order/${order.orderId}`)
+            return
+          }
+        } catch {
+          // The webhook is the backstop; keep the cart until the order page confirms payment.
+          setStage('idle')
+          setInfo('Payment submitted. We are confirming it with the payment provider.')
+          router.push(`/order/${order.orderId}`)
+          return
+        }
         clear()
         router.push(`/order/${order.orderId}`)
       },
@@ -79,7 +93,9 @@ export function CheckoutPage() {
       },
     })
     checkout.on('payment.failed', (failure) => {
+      setStage('idle')
       setError(failure.error?.description ?? 'The payment did not go through. You can try again.')
+      setInfo('Your items are still in the cart. You can review the details and retry payment.')
     })
     setStage('paying')
     checkout.open()

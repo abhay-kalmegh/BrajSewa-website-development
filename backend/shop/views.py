@@ -242,7 +242,7 @@ class OrderCollectionView(APIView):
 
             # Lock the product rows (id order, to avoid deadlocks) so two buyers cannot claim the last unit.
             products = {p.id: p for p in Product.objects.select_for_update()
-                        .filter(id__in=list(wanted), active=True, listed=True).order_by('id')}
+                        .filter(id__in=list(wanted), active=True).order_by('id')}
             if len(products) != len(wanted):
                 raise ValidationError({'detail': 'One or more products are unavailable.'})
             subtotal = sum(products[pid].price_paise * qty for pid, qty in wanted.items())
