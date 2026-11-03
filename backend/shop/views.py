@@ -123,7 +123,7 @@ class ProductDetailView(generics.RetrieveAPIView):
     """Looked up by slug. Sold-out products still resolve (so the page can say so); inactive ones do not."""
     permission_classes = [AllowAny]
     authentication_classes = []
-    queryset = Product.objects.filter(active=True)
+    queryset = Product.objects.filter(active=True, listed=True)
     serializer_class = ProductSerializer
     lookup_field = 'slug'
 
@@ -242,7 +242,7 @@ class OrderCollectionView(APIView):
 
             # Lock the product rows (id order, to avoid deadlocks) so two buyers cannot claim the last unit.
             products = {p.id: p for p in Product.objects.select_for_update()
-                        .filter(id__in=list(wanted), active=True).order_by('id')}
+                        .filter(id__in=list(wanted), active=True, listed=True).order_by('id')}
             if len(products) != len(wanted):
                 raise ValidationError({'detail': 'One or more products are unavailable.'})
             subtotal = sum(products[pid].price_paise * qty for pid, qty in wanted.items())

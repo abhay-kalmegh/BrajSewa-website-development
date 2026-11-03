@@ -323,10 +323,12 @@ class CatalogTests(ShopTestCase):
     def test_detail_resolves_by_slug_including_sold_out_but_not_inactive(self):
         Product.objects.create(name='Gone', slug='gone', price_paise=100, inventory=0)
         Product.objects.create(name='Off', slug='off', price_paise=100, inventory=5, active=False)
+        Product.objects.create(name='Internal', slug='internal', price_paise=100, inventory=5, listed=False)
         r = self.client.get('/api/v1/products/mala/')
         self.assertEqual((r.status_code, r.data['price'], r.data['category']), (200, 299.0, 'General'))
         self.assertEqual(self.client.get('/api/v1/products/gone/').status_code, 200)
         self.assertEqual(self.client.get('/api/v1/products/off/').status_code, 404)
+        self.assertEqual(self.client.get('/api/v1/products/internal/').status_code, 404)
         self.assertEqual(self.client.get('/api/v1/products/nope/').status_code, 404)
 
 

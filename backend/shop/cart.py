@@ -30,7 +30,7 @@ def quote(wanted):
     'out_of_stock', or 'unavailable' (product removed/deactivated). Lines with an issue other
     than 'reduced' have quantity 0 and are not charged.
     """
-    products = {p.id: p for p in Product.objects.filter(id__in=list(wanted), active=True)}
+    products = {p.id: p for p in Product.objects.filter(id__in=list(wanted), active=True, listed=True)}
     lines, subtotal = [], 0
     for pid, requested in wanted.items():
         product = products.get(pid)
@@ -41,7 +41,7 @@ def quote(wanted):
         allowed = min(requested, product.inventory, MAX_LINE_QUANTITY)
         issue = 'out_of_stock' if product.inventory == 0 else 'reduced' if allowed < requested else None
         subtotal += product.price_paise * allowed
-        lines.append({'productId': pid, 'slug': product.slug, 'name': product.name, 'image': product.image.url if product.image else '',
+        lines.append({'productId': pid, 'slug': product.slug, 'name': product.name, 'image': product.image.url if product.image else (product.image_url or ''),
                       'pricePaise': product.price_paise, 'quantity': allowed, 'requestedQuantity': requested,
                       'inventory': product.inventory, 'issue': issue})
     shipping = shipping_for(subtotal) if subtotal else 0
