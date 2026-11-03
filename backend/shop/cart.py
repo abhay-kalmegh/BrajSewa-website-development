@@ -30,7 +30,7 @@ def quote(wanted):
     'out_of_stock', or 'unavailable' (product removed/deactivated). Lines with an issue other
     than 'reduced' have quantity 0 and are not charged.
     """
-    products = {p.id: p for p in Product.objects.filter(id__in=list(wanted), active=True, listed=True)}
+    products = {p.id: p for p in Product.objects.filter(id__in=list(wanted), active=True)}
     lines, subtotal = [], 0
     for pid, requested in wanted.items():
         product = products.get(pid)
