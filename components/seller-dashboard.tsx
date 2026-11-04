@@ -19,6 +19,7 @@ type SellerProduct = {
 export function SellerDashboard() {
   const { user, status } = useRequireAuth()
   const [products, setProducts] = useState<SellerProduct[]>([])
+  const [orders, setOrders] = useState<Array<{ id: number; status: string; total: number; created_at: string }>>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', slug: '', price: '', inventory: '', image: '' })
@@ -30,6 +31,13 @@ export function SellerDashboard() {
         const body = await response.json()
         if (!response.ok) throw new Error(body.detail || 'Unable to load seller products.')
         setProducts(body)
+      })
+      .catch((reason: Error) => setError(reason.message))
+    fetch('/api/proxy/seller/orders/', { credentials: 'same-origin' })
+      .then(async (response) => {
+        const body = await response.json()
+        if (!response.ok) throw new Error(body.detail || 'Unable to load seller orders.')
+        setOrders(body)
       })
       .catch((reason: Error) => setError(reason.message))
   }, [status, user])
@@ -85,6 +93,13 @@ export function SellerDashboard() {
           <div className="mt-6 grid gap-3">{products.length === 0 ? <p className="rounded-2xl bg-white p-5 text-sm text-[#635951]">No products yet. Add your first devotional product to begin.</p> : products.map((product) => <article key={product.id} className="flex items-center justify-between gap-4 rounded-2xl bg-white p-4"><div><h3 className="font-semibold">{product.name}</h3><p className="mt-1 text-sm text-[#635951]">₹{(product.price_paise / 100).toLocaleString('en-IN')} · {product.inventory} in stock</p></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${product.listed ? 'bg-[#e5f2e3] text-[#38603b]' : 'bg-[#f3e4c9] text-[#805b1e]'}`}>{product.listed ? 'Published' : 'Review pending'}</span></article>)}</div>
         </section>
       </div>
+      <section className="mt-8 rounded-3xl border border-[#24201d]/10 bg-white p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#667a52]">Fulfilment</p>
+        <h2 className="mt-2 font-serif text-3xl">Recent orders containing your products</h2>
+        <div className="mt-5 grid gap-3">
+          {orders.length === 0 ? <p className="rounded-2xl bg-[#fffaf2] p-4 text-sm text-[#635951]">No seller orders yet.</p> : orders.map((order) => <article key={order.id} className="flex items-center justify-between rounded-2xl bg-[#fffaf2] p-4"><div><p className="font-semibold">Order #{order.id}</p><p className="mt-1 text-sm text-[#635951]">{new Date(order.created_at).toLocaleDateString('en-IN')}</p></div><div className="text-right"><p className="font-semibold">₹{Number(order.total).toLocaleString('en-IN')}</p><span className="text-xs uppercase tracking-wide text-[#667a52]">{order.status}</span></div></article>)}
+        </div>
+      </section>
     </PageShell>
   )
 }

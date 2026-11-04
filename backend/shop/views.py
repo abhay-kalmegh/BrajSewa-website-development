@@ -156,6 +156,19 @@ class SellerProductDetailView(generics.RetrieveUpdateAPIView):
         return Product.objects.filter(seller=seller)
 
 
+class SellerOrderListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderSerializer
+
+    def get_queryset(self):
+        seller = getattr(self.request.user, 'seller_profile', None)
+        if seller is None:
+            return Order.objects.none()
+        return (_order_queryset()
+                .filter(lines__product__seller=seller)
+                .distinct()[:50])
+
+
 # ---------------------------------------------------------------------------------- cart
 
 class CartQuoteView(APIView):
