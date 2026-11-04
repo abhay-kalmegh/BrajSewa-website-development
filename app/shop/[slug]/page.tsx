@@ -27,5 +27,16 @@ export default async function ProductPage({ params }: Params) {
       </main>
     )
   }
-  return <ProductDetail product={product} />
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.description,
+    image: typeof product.image === 'string' && product.image.startsWith('http') ? [product.image] : undefined,
+    offers: { '@type': 'Offer', priceCurrency: 'INR', price: product.price, availability: product.inventory > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', url: `https://brajsewa.com/shop/${product.slug}` },
+  }
+  return <>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }} />
+    <ProductDetail product={product} />
+  </>
 }
