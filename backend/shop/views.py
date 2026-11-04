@@ -144,6 +144,18 @@ class SellerProductListCreateView(generics.ListCreateAPIView):
         serializer.save(seller=seller)
 
 
+class SellerProductDetailView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SellerProductSerializer
+    lookup_url_kwarg = 'id'
+
+    def get_queryset(self):
+        seller = getattr(self.request.user, 'seller_profile', None)
+        if seller is None:
+            return Product.objects.none()
+        return Product.objects.filter(seller=seller)
+
+
 # ---------------------------------------------------------------------------------- cart
 
 class CartQuoteView(APIView):
