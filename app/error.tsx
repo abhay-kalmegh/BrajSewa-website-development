@@ -1,19 +1,20 @@
 'use client'
 
-import Link from 'next/link'
+import { useEffect } from 'react'
 
-/** Shown when a page can't load, e.g. the catalogue API is unreachable. */
-export default function Error({ reset }: { error: Error; reset: () => void }) {
+export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    // Keep production failures actionable without exposing server details to visitors.
+    console.error('[v0] storefront route error', { digest: error.digest })
+  }, [error.digest])
+
   return (
-    <main className="grid min-h-screen place-items-center bg-[#fff9f0] px-5 text-center text-[#24201d]">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#d66a83]">Something went wrong</p>
-        <h1 className="mt-3 font-serif text-5xl">We couldn&apos;t load this page.</h1>
-        <p className="mt-4 text-[#24201d]/60">Please try again in a moment.</p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <button onClick={reset} className="rounded-full bg-[#d99a2b] px-6 py-3 font-bold text-white">Try again</button>
-          <Link href="/" className="rounded-full border border-[#24201d]/20 px-6 py-3 font-bold">Home</Link>
-        </div>
+    <main className="mx-auto flex min-h-[70vh] max-w-4xl items-center px-6 py-16">
+      <div className="max-w-xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#b94a48]">A brief interruption</p>
+        <h1 className="mt-5 font-serif text-5xl leading-tight text-[#24201d] md:text-7xl">The page needs another moment.</h1>
+        <p className="mt-5 text-lg leading-8 text-[#635951]">Please try again. Your cart and account data are kept safely on the server.</p>
+        <button type="button" onClick={() => reset()} className="mt-8 rounded-full bg-[#24201d] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#3d342f]">Try again</button>
       </div>
     </main>
   )
