@@ -23,7 +23,7 @@ from .models import BuyerProfile, Order, OrderLine, Product, SellerProfile
 from .failopen import FailOpenMixin
 from .inputs import mapping_or_empty
 from .pricing import shipping_for
-from .serializers import (CartLinesSerializer, CreateOrderSerializer, OrderSerializer, ProductSerializer,
+from .serializers import (CartLinesSerializer, CreateOrderSerializer, OrderSerializer, OrderTrackingSerializer, ProductSerializer,
                           ProfileSerializer, RegisterSerializer, SellerProductSerializer)
 from .services import PENDING_ORDER_TTL_MINUTES, release_order
 
@@ -231,6 +231,21 @@ class CartMergeView(APIView):
 def _order_queryset():
     return (Order.objects.prefetch_related(Prefetch('lines', queryset=OrderLine.objects.select_related('product')))
             .order_by('-created_at'))
+
+
+class OrderTrackingView(APIView):
+    permission_classes = [AllowAny]
+    throttle_scope = 'orders'
+
+    def get(self, request):
+        order_id = request.query_params.get('order')
+        contact = request.query_params.get('contact', '').strip()
+        if not order_id or not contact or len(contact) > 254:
+            return Response({'detail': 'Order number and checkout email or mobile are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        order = Order.objects.filter(Q(id=order_id), Q(email__iexact=contact) | Q(phone=contact)).first()
+        if order is None:
+            return Response({'detail': 'We could not verify that order.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(OrderTrackingSerializer(order).data)
 
 
 class OrderDetailView(generics.RetrieveAPIView):

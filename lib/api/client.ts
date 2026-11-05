@@ -112,6 +112,11 @@ export const listOrders = () => request<OrderView[]>('/api/proxy/orders/')
 export const getOrder = (orderId: string | number) =>
   request<OrderView>(`/api/proxy/orders/${encodeURIComponent(String(orderId))}/`)
 
+export const trackOrder = (orderId: string, contact: string) =>
+  request<{ id: number; status: string; created_at: string; paid_at: string | null }>(
+    `/api/proxy/orders/track/?order=${encodeURIComponent(orderId)}&contact=${encodeURIComponent(contact)}`,
+  )
+
 export const verifyPayment = (payload: RazorpayPaymentResult) =>
   request<{ status: string; orderId: string }>('/api/proxy/payments/razorpay/verify/', { method: 'POST', body: json(payload) })
 
