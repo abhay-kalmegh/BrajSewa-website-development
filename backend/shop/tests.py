@@ -116,7 +116,11 @@ class PermissionTests(ShopTestCase):
         body = {'name': 'Ittar', 'slug': 'ittar', 'price_paise': 24_900, 'inventory': 5}
         self.assertEqual(self.client.post('/api/v1/seller/products/', body, format='json').status_code, 403)
         SellerProfile.objects.filter(user=self.user).update(approved=True)
-        self.assertEqual(self.client.post('/api/v1/seller/products/', body, format='json').status_code, 201)
+        response = self.client.post('/api/v1/seller/products/', body, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertFalse(response.data['listed'])
+        self.assertFalse(response.data['active'])
+        self.assertEqual(self.client.patch(f"/api/v1/seller/products/{response.data['id']}/", {'listed': True, 'active': True}, format='json').data['listed'], False)
 
 
 class OrderCreationTests(ShopTestCase):

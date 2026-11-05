@@ -17,9 +17,11 @@ async function main() {
     assert.equal(matchRule(['cart', 'quote'], 'POST')?.rule.public, true)
     for (const p of [['cart'], ['cart', 'merge'], ['orders'], ['account', 'me']]) assert.notEqual(matchRule(p, p[0] === 'cart' && p.length === 1 ? 'GET' : p[1] === 'merge' ? 'POST' : 'GET')?.rule.public, true, p.join('/'))
   })
-  await t('the seller endpoints are no longer exposed', () => {
-    for (const m of ['GET', 'POST']) assert.equal(matchRule(['seller', 'products'], m), null)
-    assert.ok(!ALLOWED.some((r) => r.prefix.startsWith('seller')))
+  await t('seller operations expose only authenticated product and order methods', () => {
+    for (const m of ['GET', 'POST', 'PATCH', 'PUT']) assert.ok(matchRule(['seller', 'products'], m), m)
+    assert.ok(matchRule(['seller', 'orders'], 'GET'))
+    assert.equal(matchRule(['seller', 'orders'], 'POST'), null)
+    assert.equal(matchRule(['seller', 'products'], 'DELETE'), null)
   })
   await t('wrong methods are refused', () => {
     assert.equal(matchRule(['cart', 'quote'], 'GET'), null); assert.equal(matchRule(['orders'], 'DELETE'), null)

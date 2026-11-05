@@ -10,10 +10,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='product',
-            name='image_url',
-        ),
+        # Keep image_url for existing catalog records and add durable uploaded-image support beside it.
         migrations.AddField(
             model_name='product',
             name='image',
