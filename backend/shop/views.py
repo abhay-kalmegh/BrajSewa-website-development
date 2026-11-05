@@ -119,11 +119,16 @@ class ProductListView(generics.ListAPIView):
     serializer_class = ProductSerializer
 
 
-class BundlePackingView(generics.RetrieveAPIView):
+class BundlePackingView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
-    queryset = Product.objects.filter(slug='seva-box-packing', active=True)
-    serializer_class = ProductSerializer
+
+    def get(self, request):
+        product = Product.objects.filter(slug='seva-box-packing', active=True).first()
+        if product is None:
+            from rest_framework.exceptions import NotFound
+            raise NotFound()
+        return Response(ProductSerializer(product).data)
 
 
 class ProductDetailView(generics.RetrieveAPIView):
