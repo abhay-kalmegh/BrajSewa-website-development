@@ -12,6 +12,13 @@ export async function getProducts(): Promise<Product[]> {
 }
 
 /** Returns null for an unknown slug so the page can render notFound(). Other failures throw. */
+export async function getBundlePacking(): Promise<Product | null> {
+  const response = await djangoFetch('/products/bundle-packing/')
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error(`Bundle packing request failed (${response.status})`)
+  return response.json()
+}
+
 export async function getProduct(slug: string): Promise<Product | null> {
   if (!/^[A-Za-z0-9_-]+$/.test(slug)) return null
   const response = await djangoFetch(`/products/${slug}/`)

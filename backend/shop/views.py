@@ -119,8 +119,15 @@ class ProductListView(generics.ListAPIView):
     serializer_class = ProductSerializer
 
 
+class BundlePackingView(generics.RetrieveAPIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    queryset = Product.objects.filter(slug='seva-box-packing', active=True)
+    serializer_class = ProductSerializer
+
+
 class ProductDetailView(generics.RetrieveAPIView):
-    """Looked up by slug. Sold-out products still resolve (so the page can say so); inactive ones do not."""
+    """Public product detail only exposes listed products."""
     permission_classes = [AllowAny]
     authentication_classes = []
     queryset = Product.objects.filter(active=True, listed=True)

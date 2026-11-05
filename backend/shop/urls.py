@@ -2,11 +2,12 @@ from django.urls import path
 
 from .payments import RazorpayVerifyView, RazorpayWebhookView
 from .views import (CartMergeView, CartQuoteView, CartView, LoginView, LogoutView, MeView, OrderCollectionView,
-                    OrderDetailView, ProductDetailView, ProductListView, RefreshView, RegisterView,
+                    BundlePackingView, OrderDetailView, ProductDetailView, ProductListView, RefreshView, RegisterView,
                     SellerOrderListView, SellerProductDetailView, SellerProductListCreateView)
 
 urlpatterns = [
     path('products/', ProductListView.as_view(), name='products'),
+    path('products/bundle-packing/', BundlePackingView.as_view(), name='bundle-packing'),
     path('products/<slug:slug>/', ProductDetailView.as_view(), name='product-detail'),
     path('cart/', CartView.as_view(), name='cart'),
     path('cart/quote/', CartQuoteView.as_view(), name='cart-quote'),
