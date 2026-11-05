@@ -481,6 +481,10 @@ class SeedCatalogTests(ShopTestCase):
         listed = [p['slug'] for p in self.client.get('/api/v1/products/').data]
         self.assertNotIn('seva-box-packing', listed)
         self.assertIn('tulsi-japa-mala', listed)
+        self.assertEqual(self.client.get('/api/v1/products/seva-box-packing/').status_code, 404)
+        bundle_response = self.client.get('/api/v1/products/bundle-packing/')
+        self.assertEqual(bundle_response.status_code, 200)
+        self.assertEqual(bundle_response.data['slug'], 'seva-box-packing')
 
 
 class HealthCheckTests(TestCase):
