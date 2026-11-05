@@ -5,8 +5,7 @@
 export type ProxyRule = { prefix: string; methods: string[]; public?: boolean }
 
 // First match wins, so the specific cart routes come before the generic one.
-// Only endpoints the storefront actually uses are listed: adding a Django endpoint never exposes it to the browser by
-// accident. (The seller endpoints were removed: no page uses them, and an unused route is attack surface for nothing.)
+// Only endpoints the storefront actually uses are listed: adding a Django endpoint never exposes it to the browser by accident.
 export const ALLOWED: ProxyRule[] = [
   { prefix: 'cart/quote/', methods: ['POST'], public: true }, // live prices for guests and customers
   { prefix: 'cart/merge/', methods: ['POST'] },
@@ -14,6 +13,8 @@ export const ALLOWED: ProxyRule[] = [
   { prefix: 'orders/', methods: ['GET', 'POST'] }, // order history, create order, order detail
   { prefix: 'payments/razorpay/verify/', methods: ['POST'] },
   { prefix: 'account/me/', methods: ['GET'] },
+  { prefix: 'seller/products/', methods: ['GET', 'POST', 'PATCH', 'PUT'] },
+  { prefix: 'seller/orders/', methods: ['GET'] },
 ]
 
 const SEGMENT = /^[A-Za-z0-9_-]+$/ // rejects '..', '.', encoded slashes, empty and anything else surprising

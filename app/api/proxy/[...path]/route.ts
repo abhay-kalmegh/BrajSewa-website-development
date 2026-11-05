@@ -48,4 +48,4 @@ async function handle(req: Request, ctx: { params: Promise<{ path: string[] }> }
   })
 }
 
-export { handle as GET, handle as POST, handle as PUT }
+export { handle as GET, handle as POST, handle as PUT, handle as PATCH }

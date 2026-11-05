@@ -127,8 +127,9 @@ class SellerProductSerializer(serializers.ModelSerializer):
             'compare_at_price_paise',
             'inventory',
             'active',
+            'listed',
         ]
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'listed', 'active']
 
 
 # ============================================================

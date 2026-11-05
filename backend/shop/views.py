@@ -141,7 +141,7 @@ class SellerProductListCreateView(generics.ListCreateAPIView):
         seller = SellerProfile.objects.filter(user=self.request.user).first()
         if seller is None or not seller.approved:
             raise PermissionDenied('Seller approval is required before publishing products.')
-        serializer.save(seller=seller)
+        serializer.save(seller=seller, listed=False, active=False)
 
 
 class SellerProductDetailView(generics.RetrieveUpdateAPIView):

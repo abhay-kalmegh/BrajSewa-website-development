@@ -23,6 +23,7 @@ export function SellerDashboard() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', slug: '', price: '', inventory: '', image: '' })
+  const [imageFile, setImageFile] = useState<File | null>(null)
 
   useEffect(() => {
     if (status !== 'ready' || !user) return
@@ -47,8 +48,17 @@ export function SellerDashboard() {
     setSaving(true)
     setError('')
     try {
-      const response = await fetch('/api/proxy/seller/products/', {
-        method: 'POST',
+    let imageUrl = form.image
+    if (imageFile) {
+      const upload = new FormData()
+      upload.set('file', imageFile)
+      const uploadResponse = await fetch('/api/uploads/product-image', { method: 'POST', body: upload })
+      const uploadBody = await uploadResponse.json()
+      if (!uploadResponse.ok) throw new Error(uploadBody.error || 'Unable to upload image.')
+      imageUrl = uploadBody.url
+    }
+    const response = await fetch('/api/proxy/seller/products/', {
+      method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -56,13 +66,14 @@ export function SellerDashboard() {
           slug: form.slug,
           price_paise: Math.round(Number(form.price) * 100),
           inventory: Number(form.inventory),
-          image_url: form.image || '',
+          image_url: imageUrl || '',
         }),
       })
       const body = await response.json()
       if (!response.ok) throw new ApiError(body.detail || 'Unable to create product.', response.status, body)
       setProducts((current) => [body, ...current])
       setForm({ name: '', slug: '', price: '', inventory: '', image: '' })
+    setImageFile(null)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to create product.')
     } finally {
@@ -83,7 +94,7 @@ export function SellerDashboard() {
             <label className="grid gap-1 text-sm font-semibold">Name<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="rounded-xl border border-[#24201d]/15 px-3 py-3 font-normal" /></label>
             <label className="grid gap-1 text-sm font-semibold">Slug<input required pattern="[a-z0-9-]+" value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} className="rounded-xl border border-[#24201d]/15 px-3 py-3 font-normal" /></label>
             <div className="grid grid-cols-2 gap-3"><label className="grid gap-1 text-sm font-semibold">Price (₹)<input required min="1" type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} className="rounded-xl border border-[#24201d]/15 px-3 py-3 font-normal" /></label><label className="grid gap-1 text-sm font-semibold">Stock<input required min="0" type="number" value={form.inventory} onChange={(event) => setForm({ ...form, inventory: event.target.value })} className="rounded-xl border border-[#24201d]/15 px-3 py-3 font-normal" /></label></div>
-            <label className="grid gap-1 text-sm font-semibold">Image URL <span className="font-normal text-[#635951]">Optional</span><input type="url" value={form.image} onChange={(event) => setForm({ ...form, image: event.target.value })} className="rounded-xl border border-[#24201d]/15 px-3 py-3 font-normal" /></label>
+            <label className="grid gap-1 text-sm font-semibold">Product image <span className="font-normal text-[#635951]">Optional, JPEG/PNG/WebP up to 5 MB</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} className="rounded-xl border border-[#24201d]/15 px-3 py-3 font-normal" /></label>
           </div>
           {error && <p role="alert" className="mt-4 rounded-xl bg-[#fff1ec] p-3 text-sm text-[#a53d2e]">{error}</p>}
           <button disabled={saving} className="mt-6 w-full rounded-full bg-[#d99a2b] px-5 py-3 font-bold text-white disabled:opacity-50">{saving ? 'Saving…' : 'Submit product'}</button>
