@@ -1,6 +1,6 @@
 # Keep setuptools current for security fixes; Razorpay 2.0.1 imports successfully without the removed pkg_resources shim.
 Django>=5.1,<6.0
-djangorestframework>=3.15,<4.0
+djangorestframework>=3.18.3,<4.0
 django-cors-headers>=4.4,<5.0
 razorpay==2.0.1
 setuptools>=84.1.0
