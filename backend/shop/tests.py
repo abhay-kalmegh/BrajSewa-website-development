@@ -459,6 +459,15 @@ class OrderHistoryTests(ShopTestCase):
         self.assertEqual(newest['lines'][0]['name'], 'Mala')
         self.assertEqual(newest['shippingAddress']['city'], 'Vrindavan')
 
+    def test_public_tracking_requires_matching_contact(self):
+        order = self.place_order()
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get(f'/api/v1/orders/track/?order={order.id}&contact=wrong@example.com').status_code, 404)
+        tracked = self.client.get(f'/api/v1/orders/track/?order={order.id}&contact={CUSTOMER["email"]}')
+        self.assertEqual(tracked.status_code, 200)
+        self.assertEqual(tracked.data['id'], order.id)
+        self.assertNotIn('shippingAddress', tracked.data)
+
     def test_history_excludes_other_customers_orders(self):
         self.place_order()
         other = get_user_model().objects.create_user('o@b.com', 'o@b.com', PASSWORD)

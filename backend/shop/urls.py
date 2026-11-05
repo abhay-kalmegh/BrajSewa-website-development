@@ -3,7 +3,7 @@ from django.urls import path
 from .payments import RazorpayVerifyView, RazorpayWebhookView
 from .views import (CartMergeView, CartQuoteView, CartView, LoginView, LogoutView, MeView, OrderCollectionView,
                     BundlePackingView, OrderDetailView, ProductDetailView, ProductListView, RefreshView, RegisterView,
-                    SellerOrderListView, SellerProductDetailView, SellerProductListCreateView)
+                    OrderTrackingView, SellerOrderListView, SellerProductDetailView, SellerProductListCreateView)
 
 urlpatterns = [
     path('products/', ProductListView.as_view(), name='products'),
@@ -21,6 +21,7 @@ urlpatterns = [
     path('seller/products/<int:id>/', SellerProductDetailView.as_view(), name='seller-product-detail'),
     path('seller/orders/', SellerOrderListView.as_view(), name='seller-orders'),
     path('orders/', OrderCollectionView.as_view(), name='orders'),
+    path('orders/track/', OrderTrackingView.as_view(), name='orders-track'),
     path('orders/<int:id>/', OrderDetailView.as_view(), name='orders-detail'),
     path('payments/razorpay/verify/', RazorpayVerifyView.as_view(), name='razorpay-verify'),
     path('payments/razorpay/webhook/', RazorpayWebhookView.as_view(), name='razorpay-webhook'),

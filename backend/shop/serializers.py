@@ -250,6 +250,12 @@ class OrderLineSerializer(serializers.ModelSerializer):
         return obj.unit_price_paise / 100
 
 
+class OrderTrackingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ['id', 'status', 'created_at', 'paid_at']
+
+
 class OrderSerializer(serializers.ModelSerializer):
     total = serializers.SerializerMethodField()
     subtotal = serializers.SerializerMethodField()
