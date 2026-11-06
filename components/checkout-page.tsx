@@ -146,7 +146,7 @@ export function CheckoutPage() {
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" onLoad={() => setScriptReady(true)} />
       <div className="mt-6"><CartNotices /></div>
       <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_380px]">
-        <form onSubmit={onSubmit} className="flex flex-col gap-5">
+        <form onSubmit={onSubmit} aria-busy={busy} className="flex flex-col gap-5">
           <h2 className="font-serif text-2xl">Contact information</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-2 text-sm font-semibold">Email
@@ -175,8 +175,8 @@ export function CheckoutPage() {
           </div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={saveAddress} onChange={(event) => setSaveAddress(event.target.checked)} /> Save this address for next time</label>
 
-          {error && <p role="alert" className="rounded-xl bg-[#d66a83]/10 px-4 py-3 text-sm text-[#a43a52]">{error}</p>}
-          {info && <p role="status" className="rounded-xl bg-[#fff5de] px-4 py-3 text-sm">{info}</p>}
+          {error && <p role="alert" aria-live="assertive" className="rounded-xl bg-[#d66a83]/10 px-4 py-3 text-sm text-[#a43a52]">{error}</p>}
+          {info && <p role="status" aria-live="polite" className="rounded-xl bg-[#fff5de] px-4 py-3 text-sm">{info}</p>}
 
           <button type="submit" disabled={busy || syncing || !scriptReady}
             className="rounded-full bg-[#d99a2b] px-5 py-4 font-bold text-white disabled:opacity-60">
