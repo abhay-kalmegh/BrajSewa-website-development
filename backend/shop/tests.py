@@ -461,11 +461,12 @@ class OrderHistoryTests(ShopTestCase):
 
     def test_public_tracking_requires_matching_contact(self):
         order = self.place_order()
+        order_id = order.data['orderId']
         self.client.force_authenticate(None)
-        self.assertEqual(self.client.get(f'/api/v1/orders/track/?order={order.id}&contact=wrong@example.com').status_code, 404)
-        tracked = self.client.get(f'/api/v1/orders/track/?order={order.id}&contact={CUSTOMER["email"]}')
+        self.assertEqual(self.client.get(f'/api/v1/orders/track/?order={order_id}&contact=wrong@example.com').status_code, 404)
+        tracked = self.client.get(f'/api/v1/orders/track/?order={order_id}&contact={CUSTOMER["email"]}')
         self.assertEqual(tracked.status_code, 200)
-        self.assertEqual(tracked.data['id'], order.id)
+        self.assertEqual(tracked.data['id'], order_id)
         self.assertNotIn('shippingAddress', tracked.data)
 
     def test_history_excludes_other_customers_orders(self):
