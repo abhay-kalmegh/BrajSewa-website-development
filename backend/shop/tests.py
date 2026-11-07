@@ -675,6 +675,19 @@ class InputValidationTests(ShopTestCase):
         for bad in ([{'a': 1}], 'not a list', ['x'] * 11, ['x' * 201], ['']):
             self.assertEqual(self.seller_post(slug='bad', details=bad).status_code, 400, repr(bad))
 
+    def test_seller_orders_only_include_owned_lines_and_safe_customer_fields(self):
+        seller = SellerProfile.objects.create(user=self.user, display_name='A', approved=True)
+        self.product.seller = seller
+        self.product.save(update_fields=['seller'])
+        self.assertEqual(self.place_order().status_code, 201)
+        response = self.client.get('/api/v1/seller/orders/')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(len(response.data), 1)
+        order = response.data[0]
+        self.assertEqual(len(order['lines']), 1)
+        self.assertNotIn('email', order['shippingAddress'])
+        self.assertNotIn('razorpay_order_id', order)
+
 
 class ApiExposureTests(TestCase):
     BROWSER_ACCEPT = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'

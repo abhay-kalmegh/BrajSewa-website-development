@@ -23,7 +23,7 @@ from .models import BuyerProfile, Order, OrderLine, Product, SellerProfile
 from .failopen import FailOpenMixin
 from .inputs import mapping_or_empty
 from .pricing import shipping_for
-from .serializers import (CartLinesSerializer, CreateOrderSerializer, OrderSerializer, OrderTrackingSerializer, ProductSerializer,
+from .serializers import (CartLinesSerializer, CreateOrderSerializer, OrderSerializer, OrderTrackingSerializer, ProductSerializer, SellerOrderSerializer,
                           ProfileSerializer, RegisterSerializer, SellerProductSerializer)
 from .services import PENDING_ORDER_TTL_MINUTES, release_order
 
@@ -170,7 +170,12 @@ class SellerProductDetailView(generics.RetrieveUpdateAPIView):
 
 class SellerOrderListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = OrderSerializer
+    serializer_class = SellerOrderSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['seller'] = getattr(self.request.user, 'seller_profile', None)
+        return context
 
     def get_queryset(self):
         seller = getattr(self.request.user, 'seller_profile', None)
