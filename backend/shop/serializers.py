@@ -256,6 +256,36 @@ class OrderTrackingSerializer(serializers.ModelSerializer):
         fields = ['id', 'status', 'created_at', 'paid_at']
 
 
+class SellerOrderSerializer(serializers.ModelSerializer):
+    total = serializers.SerializerMethodField()
+    lines = serializers.SerializerMethodField()
+    shippingAddress = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = ['id', 'status', 'total', 'paid_at', 'created_at', 'lines', 'shippingAddress']
+
+    def _seller_lines(self, obj):
+        seller = self.context.get('seller')
+        return obj.lines.filter(product__seller=seller)
+
+    def get_total(self, obj):
+        return sum(line.unit_price_paise * line.quantity for line in self._seller_lines(obj)) / 100
+
+    def get_lines(self, obj):
+        return OrderLineSerializer(self._seller_lines(obj), many=True, context=self.context).data
+
+    def get_shippingAddress(self, obj):
+        return {
+            'name': f'{obj.first_name} {obj.last_name}'.strip(),
+            'phone': obj.phone,
+            'address': obj.address,
+            'city': obj.city,
+            'state': obj.state,
+            'postalCode': obj.postal_code,
+        }
+
+
 class OrderSerializer(serializers.ModelSerializer):
     total = serializers.SerializerMethodField()
     subtotal = serializers.SerializerMethodField()
