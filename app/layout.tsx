@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   description: 'Discover devotional essentials for Shri Thakurji seva, pooja, bhakti, and everyday spiritual living.',
   metadataBase: new URL('https://brajsewa.com'),
   alternates: { canonical: '/' },
+  robots: { index: true, follow: true },
   openGraph: { title: 'BrajSewa.com — Seva, Bhakti, Life', description: 'Discover devotional essentials for Shri Thakurji seva, pooja, bhakti, and everyday spiritual living.', url: 'https://brajsewa.com', siteName: 'BrajSewa.com', type: 'website' },
   generator: 'v0.app',
   icons: {
