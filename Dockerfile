@@ -1,12 +1,12 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
-RUN corepack enable
+RUN npm install --global pnpm@12.3.4
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 # This layer is cached unless package.json or pnpm-lock.yaml change
 FROM node:22-alpine AS builder
 WORKDIR /app
-RUN corepack enable
+RUN npm install --global pnpm@12.3.4
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
