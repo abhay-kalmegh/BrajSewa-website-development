@@ -21,7 +21,7 @@ jobs:
       - run: pip install pyyaml
       # Discovery, not a hand-written list: a new tests/test_*.py file can never be silently left out of CI.
       - run: python3 -m unittest discover -s tests -t . -p 'test_*.py' -v
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
