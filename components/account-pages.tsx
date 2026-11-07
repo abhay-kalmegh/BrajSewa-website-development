@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import useSWR from 'swr'
 import { ArrowRight, Heart, Package, ShieldCheck, Truck } from 'lucide-react'
 import { OrderCard } from '@/components/order-card'
 import { GenericPage } from '@/components/site-pages'
@@ -18,19 +18,13 @@ const TABS: Array<[Section, string, string]> = [
   ['addresses', 'Address', '/account/addresses'], ['profile', 'Profile', '/account/profile'],
 ]
 
-/** Loads the customer's orders once; shared by the overview and history pages. */
+/** Shares cached customer orders between the overview and history pages. */
 function useOrders(enabled: boolean) {
-  const [orders, setOrders] = useState<OrderView[] | null>(null)
-  const [error, setError] = useState(false)
-  const [attempt, setAttempt] = useState(0)
-  useEffect(() => {
-    if (!enabled) return
-    let cancelled = false
-    setError(false)
-    listOrders().then((result) => { if (!cancelled) setOrders(result) }).catch(() => { if (!cancelled) setError(true) })
-    return () => { cancelled = true }
-  }, [enabled, attempt])
-  return { orders, error, retry: () => setAttempt((n) => n + 1) }
+  const { data: orders, error, mutate: retry } = useSWR<OrderView[]>(enabled ? 'account-orders' : null, listOrders, {
+    revalidateOnFocus: false,
+    keepPreviousData: true,
+  })
+  return { orders: orders ?? null, error: Boolean(error), retry }
 }
 
 export function AccountPages({ section }: { section: Section }) {
