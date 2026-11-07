@@ -47,7 +47,7 @@ export function buildSecurityHeaders(env = process.env) {
     })
     headers.push({
       key: env.CSP_ENFORCE === 'true' ? 'Content-Security-Policy' : 'Content-Security-Policy-Report-Only',
-      value: buildCsp({ reportUri: env.CSP_REPORT_URI ?? '' }),
+      value: buildCsp({ reportUri: env.CSP_REPORT_URI ?? '/api/csp-report' }),
     })
   }
   return headers
