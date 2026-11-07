@@ -1,12 +1,12 @@
 FROM node:25-alpine AS deps
 WORKDIR /app
-RUN corepack enable
+RUN npm install --global pnpm@12.3.4
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 # This layer is cached unless package.json or pnpm-lock.yaml change
 FROM node:25-alpine AS builder
 WORKDIR /app
-RUN corepack enable
+RUN npm install --global pnpm@12.3.4
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -22,7 +22,8 @@ FROM node:25-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+RUN apk upgrade --no-cache \
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
   && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
