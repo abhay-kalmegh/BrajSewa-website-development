@@ -107,7 +107,7 @@ def _send_delivery(delivery):
         template = os.environ['WHATSAPP_TEMPLATE_NAME']
         order = delivery.event.order
         payload = {
-            'messaging_product': 'whatsapp', 'to': delivery.recipient,
+            'messaging_product': 'whatsapp', 'to': delivery.recipient.lstrip('+'),
             'type': 'template',
             'template': {
                 'name': template, 'language': {'code': os.getenv('WHATSAPP_TEMPLATE_LANGUAGE', 'en')},
