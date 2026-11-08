@@ -125,7 +125,9 @@ def _send_delivery(delivery):
             payload, {'Authorization': f'Bearer {token}'},
         )
         messages = data.get('messages') or []
-        return str(messages[0].get('id', '')) if messages else ''
+        if not messages:
+            raise RuntimeError('WhatsApp provider did not confirm message acceptance.')
+        return str(messages[0].get('id', ''))
 
     if delivery.channel == NotificationDelivery.Channel.SMS:
         auth_key = os.environ['MSG91_AUTH_KEY']
@@ -144,6 +146,8 @@ def _send_delivery(delivery):
             'https://control.msg91.com/api/v5/flow/',
             payload, {'authkey': auth_key},
         )
+        if data.get('type') == 'error' or data.get('status') is False:
+            raise RuntimeError(str(data.get('message') or 'MSG91 rejected the notification.'))
         return str(data.get('request_id') or data.get('message') or '')
     raise ValueError(f'Unsupported notification channel: {delivery.channel}')
 
@@ -156,7 +160,7 @@ def process_notification_outbox(limit=100):
         status=NotificationDelivery.Status.SENDING,
         updated_at__lt=now - timedelta(minutes=10),
         attempt_count__lt=MAX_ATTEMPTS,
-    ).update(status=NotificationDelivery.Status.FAILED, error_message='Recovered after interrupted delivery.')
+    ).update(status=NotificationDelivery.Status.FAILED, error_message='Recovered after interrupted delivery.', updated_at=now)
 
     processed = 0
     events = NotificationEvent.objects.filter(
@@ -175,7 +179,7 @@ def process_notification_outbox(limit=100):
                 pk=delivery.pk,
                 status__in=[NotificationDelivery.Status.QUEUED, NotificationDelivery.Status.FAILED],
                 attempt_count__lt=MAX_ATTEMPTS,
-            ).update(status=NotificationDelivery.Status.SENDING, attempt_count=F('attempt_count') + 1, error_message='')
+            ).update(status=NotificationDelivery.Status.SENDING, attempt_count=F('attempt_count') + 1, error_message='', updated_at=now)
             if not claimed:
                 continue
             delivery.refresh_from_db()
