@@ -338,6 +338,24 @@ class SellerNotificationTests(ShopTestCase):
         self.assertEqual(delivery.attempt_count, 5)
         self.assertEqual(event.status, NotificationEvent.Status.PROCESSED)
 
+    def test_worker_recovers_a_stale_sending_delivery_even_after_its_last_attempt(self):
+        from .notification_service import process_notification_outbox
+
+        self.pay_latest_order()
+        event = NotificationEvent.objects.get()
+        SellerNotificationPreference.objects.create(seller=self.seller, email_enabled=False)
+        delivery = NotificationDelivery.objects.create(
+            event=event, seller=self.seller, channel=NotificationDelivery.Channel.EMAIL,
+            recipient='a@b.com', status=NotificationDelivery.Status.SENDING,
+            attempt_count=5, updated_at=timezone.now() - timedelta(minutes=11),
+        )
+        process_notification_outbox()
+        delivery.refresh_from_db()
+        event.refresh_from_db()
+        self.assertEqual(delivery.status, NotificationDelivery.Status.FAILED)
+        self.assertEqual(delivery.attempt_count, 5)
+        self.assertEqual(event.status, NotificationEvent.Status.PROCESSED)
+
     def test_seller_preferences_require_e164_and_cannot_self_verify_phone(self):
         self.client.force_authenticate(self.user)
         url = '/api/v1/seller/notifications/preferences/'
