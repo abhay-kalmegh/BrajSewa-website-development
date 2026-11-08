@@ -41,9 +41,8 @@ Configure:
 
 - `MSG91_AUTH_KEY`
 - `MSG91_TEMPLATE_ID`
-- `MSG91_SENDER_ID`
 
-The MSG91 Flow template must have three variables in this order: order number, count of the seller's line items, and seller's item subtotal (INR). Register the sender/template under India's applicable DLT requirements. The seller must opt in.
+The MSG91 Flow template must have three variables in this order (`VAR1`, `VAR2`, `VAR3`): order number, count of the seller's line items, and seller's item subtotal (INR). Configure the approved template and DLT mapping in MSG91; the sender is associated with the approved template. The seller must opt in.
 
 ## Phone verification
 
