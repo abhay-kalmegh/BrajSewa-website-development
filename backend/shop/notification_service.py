@@ -24,7 +24,7 @@ def _enabled_channels():
         'email': bool(getattr(settings, 'DEFAULT_FROM_EMAIL', '') and (getattr(settings, 'EMAIL_HOST', '') or settings.EMAIL_BACKEND.endswith('console.EmailBackend'))),
         'whatsapp': bool(os.getenv('WHATSAPP_ACCESS_TOKEN') and os.getenv('WHATSAPP_PHONE_NUMBER_ID')
                          and os.getenv('WHATSAPP_TEMPLATE_NAME')),
-        'sms': bool(os.getenv('MSG91_AUTH_KEY') and os.getenv('MSG91_TEMPLATE_ID') and os.getenv('MSG91_SENDER_ID')),
+        'sms': bool(os.getenv('MSG91_AUTH_KEY') and os.getenv('MSG91_TEMPLATE_ID') ),
     }
 
 
@@ -145,20 +145,19 @@ def _send_delivery(delivery):
         auth_key = os.environ['MSG91_AUTH_KEY']
         payload = {
             'template_id': os.environ['MSG91_TEMPLATE_ID'],
-            'sender': os.environ['MSG91_SENDER_ID'],
             'short_url': '0',
             'recipients': [{
                 'mobiles': delivery.recipient.lstrip('+'),
-                'var1': str(delivery.event.order_id),
-                'var2': str(item_count),
-                'var3': f'{amount:,.2f}',
+                'VAR1': str(delivery.event.order_id),
+                'VAR2': str(item_count),
+                'VAR3': f'{amount:,.2f}',
             }],
         }
         data = _http_post(
-            'https://control.msg91.com/api/v5/flow/',
+            'https://control.msg91.com/api/v5/flow',
             payload, {'authkey': auth_key},
         )
-        if data.get('type') == 'error' or data.get('status') is False:
+        if data.get('type') != 'success' or data.get('status') is False:
             raise RuntimeError(str(data.get('message') or 'MSG91 rejected the notification.'))
         return str(data.get('request_id') or data.get('message') or '')
     raise ValueError(f'Unsupported notification channel: {delivery.channel}')
