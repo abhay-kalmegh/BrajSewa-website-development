@@ -115,6 +115,15 @@ class PermissionTests(ShopTestCase):
         self.client.force_authenticate(self.user)
         body = {'name': 'Ittar', 'slug': 'ittar', 'price_paise': 24_900, 'inventory': 5}
         self.assertEqual(self.client.post('/api/v1/seller/products/', body, format='json').status_code, 403)
+        SellerProfile.objects.filter(user=self.user).update(approved=True)
+        response = self.client.post('/api/v1/seller/products/', body, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertFalse(response.data['listed'])
+        self.assertFalse(response.data['active'])
+        patched = self.client.patch(
+            f"/api/v1/seller/products/{response.data['id']}/",
+            {'listed': True, 'active': True}, format='json')
+        self.assertEqual(patched.data['listed'], False)
 
     def test_unapproved_seller_cannot_access_seller_data_or_upload_precheck(self):
         seller = SellerProfile.objects.create(user=self.user, display_name='A', approved=False)
@@ -130,12 +139,6 @@ class PermissionTests(ShopTestCase):
         for url in urls:
             response = self.client.get(url)
             self.assertEqual(response.status_code, 403, url)
-        SellerProfile.objects.filter(user=self.user).update(approved=True)
-        response = self.client.post('/api/v1/seller/products/', body, format='json')
-        self.assertEqual(response.status_code, 201)
-        self.assertFalse(response.data['listed'])
-        self.assertFalse(response.data['active'])
-        self.assertEqual(self.client.patch(f"/api/v1/seller/products/{response.data['id']}/", {'listed': True, 'active': True}, format='json').data['listed'], False)
 
 
     def test_quote_does_not_expose_hidden_packing_as_a_standalone_cart_item(self):
