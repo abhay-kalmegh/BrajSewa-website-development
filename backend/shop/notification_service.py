@@ -5,13 +5,11 @@ The database outbox is the source of truth. Provider outages never roll back a p
 import json
 import logging
 import os
-import urllib.error
 import urllib.request
 from datetime import timedelta
 
 from django.conf import settings
 from django.core.mail import send_mail
-from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
@@ -23,7 +21,7 @@ MAX_ATTEMPTS = 5
 
 def _enabled_channels():
     return {
-        'email': bool(getattr(settings, 'DEFAULT_FROM_EMAIL', '') and getattr(settings, 'EMAIL_HOST', '')),
+        'email': bool(getattr(settings, 'DEFAULT_FROM_EMAIL', '') and (getattr(settings, 'EMAIL_HOST', '') or settings.EMAIL_BACKEND.endswith('console.EmailBackend'))),
         'whatsapp': bool(os.getenv('WHATSAPP_ACCESS_TOKEN') and os.getenv('WHATSAPP_PHONE_NUMBER_ID')
                          and os.getenv('WHATSAPP_TEMPLATE_NAME')),
         'sms': bool(os.getenv('MSG91_AUTH_KEY') and os.getenv('MSG91_TEMPLATE_ID') and os.getenv('MSG91_SENDER_ID')),
@@ -63,20 +61,20 @@ def _order_message(delivery):
     seller = delivery.seller
     lines = order.lines.filter(product__seller=seller).select_related('product')
     items = list(lines)
-    item_text = '\\n'.join(
+    item_text = '\n'.join(
         f'- {line.product_name or line.product.name} × {line.quantity} (₹{line.unit_price_paise * line.quantity / 100:,.2f})'
         for line in items
     )
     amount = _seller_amount(order, seller) / 100
     subject = f'New BrajSewa order #{order.pk}'
     body = (
-        f'Namaste {seller.display_name},\\n\\n'
-        f'You have received a paid order on BrajSewa.\\n'
-        f'Order: #{order.pk}\\n{item_text}\\n'
-        f'Your items total: ₹{amount:,.2f}\\n\\n'
-        f'Delivery details:\\n{order.first_name} {order.last_name}\\n{order.phone}\\n'
-        f'{order.address}, {order.city}, {order.state} - {order.postal_code}\\n\\n'
-        'Please sign in to your seller dashboard to process this order.\\nBrajSewa Team'
+        f'Namaste {seller.display_name},\n\n'
+        f'You have received a paid order on BrajSewa.\n'
+        f'Order: #{order.pk}\n{item_text}\n'
+        f'Your items total: ₹{amount:,.2f}\n\n'
+        f'Delivery details:\n{order.first_name} {order.last_name}\n{order.phone}\n'
+        f'{order.address}, {order.city}, {order.state} - {order.postal_code}\n\n'
+        'Please sign in to your seller dashboard to process this order.\nBrajSewa Team'
     )
     return subject, body, amount, len(items)
 
@@ -189,9 +187,9 @@ def process_notification_outbox(limit=100):
                 delivery.error_message = ''
                 logger.info('Seller notification sent: event=%s delivery=%s channel=%s',
                             event.pk, delivery.pk, delivery.channel)
-            except (Exception,):
+            except Exception as exc:
                 delivery.status = NotificationDelivery.Status.FAILED
-                delivery.error_message = ' '.join(str(__import__('sys').exc_info()[1]).split())[:500]
+                delivery.error_message = ' '.join(str(exc).split())[:500]
                 logger.exception('Seller notification failed: event=%s delivery=%s channel=%s',
                                  event.pk, delivery.pk, delivery.channel)
             delivery.save(update_fields=[
