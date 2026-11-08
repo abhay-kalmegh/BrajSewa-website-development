@@ -450,7 +450,7 @@ class SellerNotificationPreferenceSerializer(serializers.ModelSerializer):
     def validate_phone(self, value):
         import re
         value = value.strip()
-        if value and not re.fullmatch(r'\\+[1-9][0-9]{7,14}', value):
+        if value and not re.fullmatch(r'\+[1-9][0-9]{7,14}', value):
             raise serializers.ValidationError('Enter the phone number in international format, for example +919876543210.')
         return value
 
