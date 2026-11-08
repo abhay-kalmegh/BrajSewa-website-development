@@ -64,10 +64,13 @@ export async function POST(request: Request) {
 
   let formData: FormData
   try {
+    // Materialise an ArrayBuffer (not Uint8Array<ArrayBufferLike>) for the Fetch BodyInit type.
+    const bodyBuffer = new ArrayBuffer(boundedBody.byteLength)
+    new Uint8Array(bodyBuffer).set(boundedBody)
     const boundedRequest = new Request(request.url, {
       method: 'POST',
       headers: request.headers,
-      body: boundedBody,
+      body: bodyBuffer,
     })
     formData = await boundedRequest.formData()
   } catch {
