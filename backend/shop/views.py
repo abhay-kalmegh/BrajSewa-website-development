@@ -140,6 +140,16 @@ class ProductDetailView(generics.RetrieveAPIView):
     lookup_field = 'slug'
 
 
+class SellerAccessView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        seller = getattr(request.user, 'seller_profile', None)
+        if seller is None or not seller.approved:
+            raise PermissionDenied('Approved seller access is required.')
+        return Response({'approved': True})
+
+
 class SellerProductListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = SellerProductSerializer
@@ -299,9 +309,11 @@ class OrderCollectionView(APIView):
 
             # Lock the product rows (id order, to avoid deadlocks) so two buyers cannot claim the last unit.
             products = {p.id: p for p in Product.objects.select_for_update()
-                        .filter(id__in=list(wanted), active=True).order_by('id')}
+                        .filter(id__in=list(wanted), active=True).filter(Q(listed=True) | Q(slug='seva-box-packing')).order_by('id')}
             if len(products) != len(wanted):
                 raise ValidationError({'detail': 'One or more products are unavailable.'})
+            if any(products[pid].slug == 'seva-box-packing' and qty != 1 for pid, qty in wanted.items()):
+                raise ValidationError({'detail': 'Custom seva box packing can only be added once.'})
             subtotal = sum(products[pid].price_paise * qty for pid, qty in wanted.items())
 
             # Retrying payment must not reserve the same stock twice. Reuse this customer's identical

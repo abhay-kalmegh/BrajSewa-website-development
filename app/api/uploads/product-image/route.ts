@@ -6,7 +6,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 export async function POST(request: Request) {
-  const sellerResponse = await authedFetch('/seller/products/', { method: 'GET', req: request })
+  const sellerResponse = await authedFetch('/seller/access/', { method: 'GET', req: request })
   if (!sellerResponse || sellerResponse.status === 401) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 })
   if (!sellerResponse.ok) return NextResponse.json({ error: 'Approved seller access is required.' }, { status: 403 })
 

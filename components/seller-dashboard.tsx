@@ -5,6 +5,13 @@ import { useRequireAuth } from '@/lib/auth'
 import { ApiError } from '@/lib/api/client'
 import { PageShell } from '@/components/site-pages'
 
+type SellerOrder = {
+  id: number
+  status: string
+  total: number
+  created_at: string
+}
+
 type SellerProduct = {
   id: number
   name: string
@@ -19,7 +26,7 @@ type SellerProduct = {
 export function SellerDashboard() {
   const { user, status } = useRequireAuth()
   const [products, setProducts] = useState<SellerProduct[]>([])
-  const [orders, setOrders] = useState<Array<{ id: number; status: string; total_paise: number; created_at: string }>>([])
+  const [orders, setOrders] = useState<SellerOrder[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', slug: '', price: '', inventory: '', image: '' })
@@ -108,7 +115,7 @@ export function SellerDashboard() {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#667a52]">Fulfilment</p>
         <h2 className="mt-2 font-serif text-3xl">Recent orders containing your products</h2>
         <div className="mt-5 grid gap-3">
-          {orders.length === 0 ? <p className="rounded-2xl bg-[#fffaf2] p-4 text-sm text-[#635951]">No seller orders yet.</p> : orders.map((order) => <article key={order.id} className="flex items-center justify-between rounded-2xl bg-[#fffaf2] p-4"><div><p className="font-semibold">Order #{order.id}</p><p className="mt-1 text-sm text-[#635951]">{new Date(order.created_at).toLocaleDateString('en-IN')}</p></div><div className="text-right"><p className="font-semibold">₹{(Number(order.total_paise) / 100).toLocaleString('en-IN')}</p><span className="text-xs uppercase tracking-wide text-[#667a52]">{order.status}</span></div></article>)}
+          {orders.length === 0 ? <p className="rounded-2xl bg-[#fffaf2] p-4 text-sm text-[#635951]">No seller orders yet.</p> : orders.map((order) => <article key={order.id} className="flex items-center justify-between rounded-2xl bg-[#fffaf2] p-4"><div><p className="font-semibold">Order #{order.id}</p><p className="mt-1 text-sm text-[#635951]">{new Date(order.created_at).toLocaleDateString('en-IN')}</p></div><div className="text-right"><p className="font-semibold">₹{(Number(order.total)).toLocaleString('en-IN')}</p><span className="text-xs uppercase tracking-wide text-[#667a52]">{order.status}</span></div></article>)}
         </div>
       </section>
     </PageShell>

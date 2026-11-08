@@ -143,6 +143,7 @@ services:
       NODE_ENV: production
       # Server-side only. The browser never talks to Django directly.
       API_INTERNAL_URL: http://backend:8000
+      BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN:?Set BLOB_READ_WRITE_TOKEN}
       TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
       AUTH_REFRESH_DAYS: ${SESSION_REFRESH_DAYS:-3}      # keep equal to the backend's JWT_REFRESH_DAYS
       # Auth cookies carry the Secure flag by default. The production server refuses to start handing out insecure
