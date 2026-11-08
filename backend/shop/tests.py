@@ -292,7 +292,9 @@ class SellerNotificationTests(ShopTestCase):
         self.assertEqual(response.status_code, 201, response.data)
         order = Order.objects.get()
         self.client.force_authenticate(self.user)
-        payload = {'razorpay_order_id': 'order_X', 'razorpay_payment_id': 'pay_1',\n                   'razorpay_signature': sign('secret', b'order_X|pay_1')}\n        paid = self.client.post('/api/v1/payments/razorpay/verify/', payload, format='json')
+        payload = {'razorpay_order_id': 'order_X', 'razorpay_payment_id': 'pay_1',
+                   'razorpay_signature': sign('secret', b'order_X|pay_1')}
+        paid = self.client.post('/api/v1/payments/razorpay/verify/', payload, format='json')
         self.assertEqual(paid.status_code, 200, paid.data)
         return order
 
