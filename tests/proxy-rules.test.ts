@@ -10,7 +10,8 @@ async function main() {
   // ---- routing -----------------------------------------------------------------------------------------------
   await t('every storefront route is reachable with the right method', () => {
     for (const [path, method] of [['cart/quote', 'POST'], ['cart/merge', 'POST'], ['cart', 'GET'], ['cart', 'PUT'], ['orders', 'GET'], ['orders', 'POST'],
-      ['orders/12', 'GET'], ['payments/razorpay/verify', 'POST'], ['account/me', 'GET']] as const)
+      ['orders/12', 'GET'], ['payments/razorpay/verify', 'POST'], ['account/me', 'GET'],
+      ['seller/notifications/preferences', 'GET'], ['seller/notifications/preferences', 'PATCH'], ['seller/notifications', 'GET']] as const)
       assert.ok(matchRule(path.split('/'), method), `${method} ${path}`)
   })
   await t('only the quote route is usable without a session', () => {
@@ -21,6 +22,10 @@ async function main() {
     for (const m of ['GET', 'POST', 'PATCH', 'PUT']) assert.ok(matchRule(['seller', 'products'], m), m)
     assert.ok(matchRule(['seller', 'orders'], 'GET'))
     assert.equal(matchRule(['seller', 'orders'], 'POST'), null)
+    assert.ok(matchRule(['seller', 'notifications', 'preferences'], 'GET'))
+    assert.ok(matchRule(['seller', 'notifications', 'preferences'], 'PATCH'))
+    assert.ok(matchRule(['seller', 'notifications'], 'GET'))
+    assert.equal(matchRule(['seller', 'notifications'], 'POST'), null)
     assert.equal(matchRule(['seller', 'products'], 'DELETE'), null)
   })
   await t('wrong methods are refused', () => {
