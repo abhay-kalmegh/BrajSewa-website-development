@@ -183,7 +183,7 @@ export function SellerDashboard() {
       <section className="mt-8 rounded-3xl border border-[#24201d]/10 bg-white p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#667a52]">Seller alerts</p>
         <h2 className="mt-2 font-serif text-3xl">Notification preferences</h2>
-        <p className="mt-2 text-sm text-[#635951]">Email can be enabled immediately. WhatsApp and SMS require a verified phone number, your opt-in, and configured provider credentials.</p>
+        <p className="mt-2 text-sm text-[#635951]">Email can be enabled immediately. WhatsApp and SMS require a verified phone number, your opt-in, and configured provider credentials. By enabling a messaging channel, you agree to receive transactional order alerts there; you can opt out at any time.</p>
         {notificationPrefs ? (
           <div className="mt-5 grid gap-4">
             <label className="grid gap-1 text-sm font-semibold">Mobile number (international format)
