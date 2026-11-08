@@ -73,6 +73,22 @@ services:
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+      EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-no-reply@brajsewa.com}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_GRAPH_API_VERSION: ${WHATSAPP_GRAPH_API_VERSION:-v21.0}
+      WHATSAPP_TEMPLATE_NAME: ${WHATSAPP_TEMPLATE_NAME:-}
+      WHATSAPP_TEMPLATE_LANGUAGE: ${WHATSAPP_TEMPLATE_LANGUAGE:-en}
+      MSG91_AUTH_KEY: ${MSG91_AUTH_KEY:-}
+      MSG91_TEMPLATE_ID: ${MSG91_TEMPLATE_ID:-}
+      MSG91_SENDER_ID: ${MSG91_SENDER_ID:-}
     depends_on:
       db:
         condition: service_healthy
@@ -120,7 +136,7 @@ services:
     # every day (288th pass) delete expired entries from the JWT blacklist table, which otherwise grows forever.
     # `|| true` keeps the loop alive when reconcile exits non-zero to flag a discrepancy (it logs "MANUAL REVIEW" lines).
     # `$$` is compose's escape for a literal `$`.
-    command: ["sh", "-c", "i=0; while true; do python manage.py expire_orders --minutes 30; i=$$((i+1)); if [ $$((i % 12)) -eq 0 ]; then python manage.py reconcile_payments || true; fi; if [ $$((i % 288)) -eq 0 ]; then python manage.py flushexpiredtokens || true; fi; sleep 300; done"]
+    command: ["sh", "-c", "i=0; while true; do python manage.py process_notification_outbox --limit 100 || true; i=$((i+1)); if [ $((i % 5)) -eq 0 ]; then python manage.py expire_orders --minutes 30; fi; if [ $((i % 60)) -eq 0 ]; then python manage.py reconcile_payments || true; fi; if [ $((i % 1440)) -eq 0 ]; then python manage.py flushexpiredtokens || true; fi; sleep 60; done"]
     healthcheck:
       disable: true   # this container does not serve HTTP
     depends_on:
