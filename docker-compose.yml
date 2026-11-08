@@ -136,7 +136,7 @@ services:
     # every day (288th pass) delete expired entries from the JWT blacklist table, which otherwise grows forever.
     # `|| true` keeps the loop alive when reconcile exits non-zero to flag a discrepancy (it logs "MANUAL REVIEW" lines).
     # `$$` is compose's escape for a literal `$`.
-    command: ["sh", "-c", "i=0; while true; do python manage.py process_notification_outbox --limit 100 || true; i=$((i+1)); if [ $((i % 5)) -eq 0 ]; then python manage.py expire_orders --minutes 30; fi; if [ $((i % 60)) -eq 0 ]; then python manage.py reconcile_payments || true; fi; if [ $((i % 1440)) -eq 0 ]; then python manage.py flushexpiredtokens || true; fi; sleep 60; done"]
+    command: ["python", "scripts/scheduler.py"]
     healthcheck:
       disable: true   # this container does not serve HTTP
     depends_on:
