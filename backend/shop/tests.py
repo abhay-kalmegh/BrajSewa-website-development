@@ -115,12 +115,40 @@ class PermissionTests(ShopTestCase):
         self.client.force_authenticate(self.user)
         body = {'name': 'Ittar', 'slug': 'ittar', 'price_paise': 24_900, 'inventory': 5}
         self.assertEqual(self.client.post('/api/v1/seller/products/', body, format='json').status_code, 403)
+
+    def test_unapproved_seller_cannot_access_seller_data_or_upload_precheck(self):
+        seller = SellerProfile.objects.create(user=self.user, display_name='A', approved=False)
+        self.product.seller = seller
+        self.product.save(update_fields=['seller'])
+        self.client.force_authenticate(self.user)
+        urls = [
+            '/api/v1/seller/access/',
+            '/api/v1/seller/products/',
+            f'/api/v1/seller/products/{self.product.id}/',
+            '/api/v1/seller/orders/',
+        ]
+        for url in urls:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403, url)
         SellerProfile.objects.filter(user=self.user).update(approved=True)
         response = self.client.post('/api/v1/seller/products/', body, format='json')
         self.assertEqual(response.status_code, 201)
         self.assertFalse(response.data['listed'])
         self.assertFalse(response.data['active'])
         self.assertEqual(self.client.patch(f"/api/v1/seller/products/{response.data['id']}/", {'listed': True, 'active': True}, format='json').data['listed'], False)
+
+
+    def test_quote_does_not_expose_hidden_packing_as_a_standalone_cart_item(self):
+        packing = Product.objects.create(
+            name='Packing', slug='seva-box-packing', price_paise=14_900,
+            inventory=10, listed=False,
+        )
+        response = self.client.post('/api/v1/cart/quote/', {
+            'lines': [{'productId': packing.id, 'quantity': 1}],
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['lines'][0]['issue'], 'unavailable')
+        self.assertEqual(response.data['totalPaise'], 0)
 
 
 class OrderCreationTests(ShopTestCase):
@@ -156,6 +184,26 @@ class OrderCreationTests(ShopTestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.inventory, 3)
         self.assertEqual(Order.objects.get().status, Order.Status.FAILED)
+
+    def test_checkout_rejects_hidden_packing_sku_without_required_box_contents(self):
+        packing = Product.objects.create(
+            name='Packing', slug='seva-box-packing', price_paise=14_900,
+            inventory=10, listed=False,
+        )
+        response = self.place_order(lines=[{'productId': packing.id, 'quantity': 1}])
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Order.objects.count(), 0)
+
+    def test_checkout_accepts_custom_box_with_one_item_from_each_required_group(self):
+        products = [
+            Product.objects.create(name='Tulsi Mala', slug='tulsi-japa-mala', price_paise=29_900, inventory=5),
+            Product.objects.create(name='Mogra Ittar', slug='mogra-ittar', price_paise=24_900, inventory=5),
+            Product.objects.create(name='Yellow Chandan', slug='yellow-chandan', price_paise=9_900, inventory=5),
+            Product.objects.create(name='Packing', slug='seva-box-packing', price_paise=14_900, inventory=5, listed=False),
+        ]
+        response = self.place_order(lines=[{'productId': product.id, 'quantity': 1} for product in products])
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Order.objects.get().subtotal_paise, sum(product.price_paise for product in products))
 
     def test_invalid_pin_code_is_rejected(self):
         self.client.force_authenticate(self.user)
@@ -680,6 +728,9 @@ class InputValidationTests(ShopTestCase):
         self.product.seller = seller
         self.product.save(update_fields=['seller'])
         self.assertEqual(self.place_order().status_code, 201)
+        order = Order.objects.get()
+        self.assertEqual(self.client.get('/api/v1/seller/orders/').data, [])  # pending payment is not seller-actionable
+        Order.objects.filter(pk=order.pk).update(status=Order.Status.PAID)
         response = self.client.get('/api/v1/seller/orders/')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(len(response.data), 1)
