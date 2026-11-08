@@ -136,3 +136,71 @@ class CartItem(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['cart', 'product'], name='cartitem_unique_product')]
+
+
+class SellerNotificationPreference(models.Model):
+    seller = models.OneToOneField(
+        SellerProfile, related_name='notification_preferences', on_delete=models.CASCADE,
+    )
+    phone = models.CharField(max_length=24, blank=True)
+    phone_verified = models.BooleanField(default=False)
+    email_enabled = models.BooleanField(default=True)
+    whatsapp_opt_in = models.BooleanField(default=False)
+    sms_opt_in = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'Notification preferences: {self.seller.display_name}'
+
+
+class NotificationEvent(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        PROCESSED = 'processed', 'Processed'
+
+    order = models.ForeignKey(Order, related_name='notification_events', on_delete=models.PROTECT)
+    event_type = models.CharField(max_length=40, default='order_paid')
+    idempotency_key = models.CharField(max_length=100, unique=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.event_type} for order {self.order_id}'
+
+
+class NotificationDelivery(models.Model):
+    class Channel(models.TextChoices):
+        EMAIL = 'email', 'Email'
+        WHATSAPP = 'whatsapp', 'WhatsApp'
+        SMS = 'sms', 'SMS'
+
+    class Status(models.TextChoices):
+        QUEUED = 'queued', 'Queued'
+        SENDING = 'sending', 'Sending'
+        SENT = 'sent', 'Sent'
+        FAILED = 'failed', 'Failed'
+        SKIPPED = 'skipped', 'Skipped'
+
+    event = models.ForeignKey(NotificationEvent, related_name='deliveries', on_delete=models.PROTECT)
+    seller = models.ForeignKey(SellerProfile, related_name='notification_deliveries', on_delete=models.PROTECT)
+    channel = models.CharField(max_length=12, choices=Channel.choices)
+    recipient = models.CharField(max_length=254)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.QUEUED)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    provider_message_id = models.CharField(max_length=160, blank=True)
+    error_message = models.CharField(max_length=500, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['event', 'seller', 'channel'], name='shop_notify_once_channel'),
+        ]
+        indexes = [models.Index(fields=['status', 'created_at'], name='shop_notify_status_created_idx')]
+
+    def __str__(self):
+        return f'{self.channel} notification for seller {self.seller_id} ({self.status})'
