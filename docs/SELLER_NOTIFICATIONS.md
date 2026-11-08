@@ -59,5 +59,5 @@ All endpoints require an authenticated, approved seller. The preferences API nev
 
 - `sent` means the provider accepted the message; it does not guarantee the recipient's handset or inbox received it.
 - The outbox and delivery rows are retained as an audit trail.
-- The scheduler retries failures once per minute, with a maximum of five attempts per channel.
+- The scheduler retries failures once per minute, with a maximum of five attempts per channel. Delivery is at-least-once: if a provider accepts a message but the worker crashes before saving the acceptance response, a retry can produce a duplicate.
 - Provider credentials belong in deployment secrets/environment variables, never in source control.
