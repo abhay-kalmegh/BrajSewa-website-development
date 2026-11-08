@@ -4,7 +4,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Order, OrderLine, Product
+from .models import NotificationDelivery, Order, OrderLine, Product, SellerNotificationPreference
 from .validators import PIN_CODE_PATTERN, clean_details, is_allowed_image
 
 
@@ -438,3 +438,34 @@ class ProfileSerializer(serializers.Serializer):
             'state': buyer.state,
             'postalCode': buyer.postal_code,
         }
+
+
+class SellerNotificationPreferenceSerializer(serializers.ModelSerializer):
+    phone_verified = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = SellerNotificationPreference
+        fields = ['phone', 'phone_verified', 'email_enabled', 'whatsapp_opt_in', 'sms_opt_in']
+
+    def validate_phone(self, value):
+        import re
+        value = value.strip()
+        if value and not re.fullmatch(r'\\+[1-9][0-9]{7,14}', value):
+            raise serializers.ValidationError('Enter the phone number in international format, for example +919876543210.')
+        return value
+
+    def update(self, instance, validated_data):
+        new_phone = validated_data.get('phone', instance.phone)
+        if new_phone != instance.phone:
+            instance.phone_verified = False
+        return super().update(instance, validated_data)
+
+
+class SellerNotificationDeliverySerializer(serializers.ModelSerializer):
+    order_id = serializers.IntegerField(source='event.order_id', read_only=True)
+
+    class Meta:
+        model = NotificationDelivery
+        fields = ['id', 'order_id', 'channel', 'recipient', 'status', 'attempt_count',
+                  'error_message', 'sent_at', 'created_at']
+        read_only_fields = fields
