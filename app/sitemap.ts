@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { getProducts } from '@/lib/api/catalog'
+import { ARTICLES } from '@/components/blog-article'
 
 const publicRoutes = ['', '/shop', '/about', '/blog', '/faq', '/contact', '/help', '/track-order', '/shipping-policy', '/returns-refunds', '/cancellation-policy', '/payment-policy', '/privacy-policy', '/cookie-policy', '/terms']
 
@@ -18,5 +19,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: 'weekly' as const,
     priority: 0.8,
   }))
-  return [...staticEntries, ...productEntries]
+  const articleEntries = Object.keys(ARTICLES).map((slug) => ({
+    url: `${baseUrl}/blog/${slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'monthly' as const,
+    priority: 0.7,
+  }))
+  return [...staticEntries, ...productEntries, ...articleEntries]
 }
