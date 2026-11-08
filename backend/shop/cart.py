@@ -6,6 +6,7 @@ up here, so a tampered localStorage cart cannot change what a customer is charge
 from collections import OrderedDict
 
 from django.db import transaction
+from django.db.models import Q
 
 from .models import Cart, CartItem, Product
 from .pricing import shipping_for
@@ -30,7 +31,7 @@ def quote(wanted):
     'out_of_stock', or 'unavailable' (product removed/deactivated). Lines with an issue other
     than 'reduced' have quantity 0 and are not charged.
     """
-    products = {p.id: p for p in Product.objects.filter(id__in=list(wanted), active=True)}
+    products = {p.id: p for p in Product.objects.filter(id__in=list(wanted), active=True).filter(Q(listed=True) | Q(slug='seva-box-packing'))}
     lines, subtotal = [], 0
     for pid, requested in wanted.items():
         product = products.get(pid)

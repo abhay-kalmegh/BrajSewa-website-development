@@ -11,14 +11,24 @@ export async function POST(request: Request) {
   const contentLength = Number(request.headers.get('content-length') ?? 0)
   if (contentLength > MAX_REPORT_BYTES) return new Response(null, { status: 413, headers: { 'Cache-Control': 'no-store' } })
 
-  const report = await request.text()
-  if (new TextEncoder().encode(report).byteLength > MAX_REPORT_BYTES) {
-    return new Response(null, { status: 413, headers: { 'Cache-Control': 'no-store' } })
+  if (!request.body) return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })
+
+  const reader = request.body.getReader()
+  let received = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      received += value.byteLength
+      if (received > MAX_REPORT_BYTES) {
+        await reader.cancel()
+        return new Response(null, { status: 413, headers: { 'Cache-Control': 'no-store' } })
+      }
+    }
+  } finally {
+    reader.releaseLock()
   }
 
-  if (report) {
-    console.warn('[csp-report]', report.slice(0, MAX_REPORT_BYTES))
-  }
-
+  console.info('[csp-report]', { contentType, bytes: received })
   return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })
 }

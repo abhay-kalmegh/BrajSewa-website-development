@@ -69,14 +69,25 @@ PRODUCTS = [
 class Command(BaseCommand):
     help = 'Create or update the demo catalogue (matched by slug). Edit real data in the admin afterwards.'
 
+    def add_arguments(self, parser):
+        parser.add_argument('--reset', action='store_true', help='Overwrite existing demo products.')
+
     def handle(self, *args, **options):
-        created = updated = 0
+        created = updated = skipped = 0
         for order, (slug, name, category, price, compare, stock, image, badge, description, details, listed) in enumerate(PRODUCTS):
-            _, was_created = Product.objects.update_or_create(slug=slug, defaults={
+            defaults = {
                 'name': name, 'category': category, 'price_paise': price * 100,
                 'compare_at_price_paise': compare * 100 if compare else None, 'inventory': stock,
                 'image_url': image, 'badge': badge, 'description': description, 'details': details,
-                'listed': listed, 'active': True, 'sort_order': order})
-            created += was_created
-            updated += not was_created
-        self.stdout.write(self.style.SUCCESS(f'Catalogue ready: {created} created, {updated} updated.'))
+                'listed': listed, 'active': True, 'sort_order': order}
+            product, was_created = Product.objects.get_or_create(slug=slug, defaults=defaults)
+            if was_created:
+                created += 1
+            elif options['reset']:
+                for key, value in defaults.items():
+                    setattr(product, key, value)
+                product.save(update_fields=list(defaults))
+                updated += 1
+            else:
+                skipped += 1
+        self.stdout.write(self.style.SUCCESS(f'Catalogue ready: {created} created, {updated} updated, {skipped} existing products preserved.'))
