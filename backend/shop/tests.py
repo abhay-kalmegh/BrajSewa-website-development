@@ -10,13 +10,14 @@ from django.contrib import admin
 from django.test import RequestFactory
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core import mail
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework.throttling import SimpleRateThrottle
 
-from .models import Order, Product, SellerProfile
+from .models import NotificationDelivery, NotificationEvent, Order, Product, SellerNotificationPreference, SellerProfile
 from .serializers import CustomerSerializer, ProfileSerializer
 
 PASSWORD = 'correct-horse-9'
@@ -235,6 +236,7 @@ class PaymentTests(ShopTestCase):
             self.assertEqual(r.status_code, 200, r.data)
         order = Order.objects.get()
         self.assertEqual((order.status, order.razorpay_payment_id), (Order.Status.PAID, 'pay_1'))
+        self.assertEqual(NotificationEvent.objects.filter(order=order).count(), 1)
 
     def test_verify_rejects_bad_signature(self):
         self.place_order()
@@ -275,6 +277,88 @@ class PaymentTests(ShopTestCase):
     def test_webhook_for_unknown_order_is_acknowledged(self):
         self.client.force_authenticate(None)
         self.assertEqual(self.webhook(order_id='order_unknown').status_code, 200)
+
+
+
+class SellerNotificationTests(ShopTestCase):
+    def setUp(self):
+        super().setUp()
+        self.seller = SellerProfile.objects.create(user=self.user, display_name='Mala Seller', approved=True)
+        self.product.seller = self.seller
+        self.product.save(update_fields=['seller'])
+
+    def pay_latest_order(self):
+        response = self.place_order()
+        self.assertEqual(response.status_code, 201, response.data)
+        order = Order.objects.get()
+        self.client.force_authenticate(self.user)
+        paid = self.client.post(PaymentTests.VERIFY, PaymentTests().verify_payload(), format='json')
+        self.assertEqual(paid.status_code, 200, paid.data)
+        return order
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        EMAIL_HOST='smtp.example.test',
+        DEFAULT_FROM_EMAIL='orders@brajsewa.test',
+    )
+    def test_paid_order_creates_one_email_delivery_and_worker_is_idempotent(self):
+        from .notification_service import process_notification_outbox
+
+        self.pay_latest_order()
+        event = NotificationEvent.objects.get()
+        self.assertEqual(event.idempotency_key, f'order-paid:{event.order_id}')
+        self.assertEqual(process_notification_outbox(), 1)
+        delivery = NotificationDelivery.objects.get(event=event, seller=self.seller, channel='email')
+        self.assertEqual(delivery.status, NotificationDelivery.Status.SENT)
+        self.assertEqual(delivery.attempt_count, 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(f'#{event.order_id}', mail.outbox[0].subject)
+        self.assertIn('Delivery details', mail.outbox[0].body)
+        self.assertEqual(process_notification_outbox(), 0)
+        self.assertEqual(NotificationDelivery.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        EMAIL_HOST='smtp.example.test',
+        DEFAULT_FROM_EMAIL='orders@brajsewa.test',
+    )
+    def test_failed_email_is_retried_and_event_reaches_terminal_state(self):
+        from .notification_service import process_notification_outbox
+
+        self.pay_latest_order()
+        with patch('shop.notification_service.send_mail', side_effect=RuntimeError('SMTP unavailable')):
+            for _ in range(5):
+                process_notification_outbox()
+        delivery = NotificationDelivery.objects.get(channel='email')
+        event = NotificationEvent.objects.get()
+        self.assertEqual(delivery.status, NotificationDelivery.Status.FAILED)
+        self.assertEqual(delivery.attempt_count, 5)
+        self.assertEqual(event.status, NotificationEvent.Status.PROCESSED)
+
+    def test_seller_preferences_require_e164_and_cannot_self_verify_phone(self):
+        self.client.force_authenticate(self.user)
+        url = '/api/v1/seller/notifications/preferences/'
+        response = self.client.patch(url, {
+            'phone': '9876543210', 'phone_verified': True, 'whatsapp_opt_in': True,
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        response = self.client.patch(url, {
+            'phone': '+919876543210', 'phone_verified': True, 'whatsapp_opt_in': True,
+            'sms_opt_in': True, 'email_enabled': False,
+        }, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(response.data['phone_verified'])
+        self.assertTrue(response.data['whatsapp_opt_in'])
+        prefs = SellerNotificationPreference.objects.get(seller=self.seller)
+        self.assertFalse(prefs.phone_verified)
+
+    def test_unapproved_seller_cannot_read_or_change_notification_settings(self):
+        self.seller.approved = False
+        self.seller.save(update_fields=['approved'])
+        self.client.force_authenticate(self.user)
+        self.assertEqual(self.client.get('/api/v1/seller/notifications/preferences/').status_code, 403)
+        self.assertEqual(self.client.get('/api/v1/seller/notifications/').status_code, 403)
 
 
 class InventoryRestorationTests(ShopTestCase):
