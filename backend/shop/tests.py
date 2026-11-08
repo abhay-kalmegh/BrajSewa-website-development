@@ -346,8 +346,10 @@ class SellerNotificationTests(ShopTestCase):
         SellerNotificationPreference.objects.create(seller=self.seller, email_enabled=False)
         delivery = NotificationDelivery.objects.create(
             event=event, seller=self.seller, channel=NotificationDelivery.Channel.EMAIL,
-            recipient='a@b.com', status=NotificationDelivery.Status.SENDING,
-            attempt_count=5, updated_at=timezone.now() - timedelta(minutes=11),
+            recipient='a@b.com', status=NotificationDelivery.Status.SENDING, attempt_count=5,
+        )
+        NotificationDelivery.objects.filter(pk=delivery.pk).update(
+            updated_at=timezone.now() - timedelta(minutes=11),
         )
         process_notification_outbox()
         delivery.refresh_from_db()
