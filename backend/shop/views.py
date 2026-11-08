@@ -10,7 +10,7 @@ from django.db.models import F, Prefetch, Q
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
@@ -34,6 +34,17 @@ class Conflict(APIException):
     status_code = status.HTTP_409_CONFLICT
     default_detail = 'Not enough stock.'
     default_code = 'conflict'
+
+
+class IsApprovedSeller(BasePermission):
+    message = 'Approved seller access is required.'
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and SellerProfile.objects.filter(user=request.user, approved=True).exists()
+        )
 
 
 # --------------------------------------------------------------------------- auth
@@ -141,7 +152,7 @@ class ProductDetailView(generics.RetrieveAPIView):
 
 
 class SellerAccessView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsApprovedSeller]
 
     def get(self, request):
         seller = getattr(request.user, 'seller_profile', None)
@@ -151,7 +162,7 @@ class SellerAccessView(APIView):
 
 
 class SellerProductListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsApprovedSeller]
     serializer_class = SellerProductSerializer
 
     def get_queryset(self):
@@ -167,7 +178,7 @@ class SellerProductListCreateView(generics.ListCreateAPIView):
 
 
 class SellerProductDetailView(generics.RetrieveUpdateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsApprovedSeller]
     serializer_class = SellerProductSerializer
     lookup_url_kwarg = 'id'
 
@@ -179,7 +190,7 @@ class SellerProductDetailView(generics.RetrieveUpdateAPIView):
 
 
 class SellerOrderListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsApprovedSeller]
     serializer_class = SellerOrderSerializer
 
     def get_serializer_context(self):
@@ -192,7 +203,8 @@ class SellerOrderListView(generics.ListAPIView):
         if seller is None:
             return Order.objects.none()
         return (_order_queryset()
-                .filter(lines__product__seller=seller)
+                .filter(status__in=[Order.Status.PAID, Order.Status.FULFILLED],
+                        lines__product__seller=seller)
                 .distinct()[:50])
 
 
@@ -312,8 +324,10 @@ class OrderCollectionView(APIView):
                         .filter(id__in=list(wanted), active=True).filter(Q(listed=True) | Q(slug='seva-box-packing')).order_by('id')}
             if len(products) != len(wanted):
                 raise ValidationError({'detail': 'One or more products are unavailable.'})
-            if any(products[pid].slug == 'seva-box-packing' and qty != 1 for pid, qty in wanted.items()):
-                raise ValidationError({'detail': 'Custom seva box packing can only be added once.'})
+            if not cart_logic.has_valid_custom_box(wanted, products):
+                raise ValidationError({
+                    'detail': 'Custom seva box packing requires one item from each of the mala, fragrance and chandan groups, and can only be added once.'
+                })
             subtotal = sum(products[pid].price_paise * qty for pid, qty in wanted.items())
 
             # Retrying payment must not reserve the same stock twice. Reuse this customer's identical

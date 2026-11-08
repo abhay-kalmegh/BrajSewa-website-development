@@ -13,6 +13,27 @@ from .pricing import shipping_for
 
 MAX_LINE_QUANTITY = 20  # same cap the order API enforces per line
 
+# The custom-box builder always includes one selection from each of these groups.
+# Keep this validation server-side: the browser's cart can be edited by the customer.
+CUSTOM_BOX_REQUIRED_GROUPS = (
+    frozenset({'tulsi-japa-mala', 'kanthi-mala'}),
+    frozenset({'mogra-ittar', 'sandal-ittar'}),
+    frozenset({'yellow-chandan', 'red-chandan'}),
+)
+
+
+def has_valid_custom_box(wanted, products):
+    """Return False if the hidden packing SKU is present without the required box contents."""
+    packing_ids = [pid for pid, product in products.items()
+                   if product.slug == 'seva-box-packing' and wanted.get(pid, 0) > 0]
+    if not packing_ids:
+        return True
+    if len(packing_ids) != 1 or wanted.get(packing_ids[0]) != 1:
+        return False
+
+    selected_slugs = {product.slug for pid, product in products.items() if wanted.get(pid, 0) > 0}
+    return all(selected_slugs.intersection(group) for group in CUSTOM_BOX_REQUIRED_GROUPS)
+
 
 def merge_lines(*line_sets):
     """Combine several [{'productId', 'quantity'}] lists into {product_id: quantity}, summing duplicates."""
@@ -32,6 +53,8 @@ def quote(wanted):
     than 'reduced' have quantity 0 and are not charged.
     """
     products = {p.id: p for p in Product.objects.filter(id__in=list(wanted), active=True).filter(Q(listed=True) | Q(slug='seva-box-packing'))}
+    if not has_valid_custom_box(wanted, products):
+        products = {pid: product for pid, product in products.items() if product.slug != 'seva-box-packing'}
     lines, subtotal = [], 0
     for pid, requested in wanted.items():
         product = products.get(pid)
