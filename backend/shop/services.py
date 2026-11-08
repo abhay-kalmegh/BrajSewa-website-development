@@ -5,7 +5,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
-from .models import Order, Product
+from .models import NotificationEvent, Order, Product
 
 logger = logging.getLogger(__name__)
 
@@ -56,4 +56,10 @@ def mark_paid(razorpay_order_id, payment_id, amount_paise=None):
         order.razorpay_payment_id = payment_id or ''
         order.paid_at = timezone.now()
         order.save(update_fields=['status', 'razorpay_payment_id', 'paid_at', 'updated_at'])
+        # The outbox event is committed atomically with the paid state. A unique key makes
+        # repeated Razorpay browser callbacks/webhooks safe.
+        NotificationEvent.objects.get_or_create(
+            idempotency_key=f'order-paid:{order.pk}',
+            defaults={'order': order, 'event_type': 'order_paid'},
+        )
         return order
