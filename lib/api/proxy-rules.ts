@@ -15,6 +15,8 @@ export const ALLOWED: ProxyRule[] = [
   { prefix: 'account/me/', methods: ['GET'] },
   { prefix: 'seller/products/', methods: ['GET', 'POST', 'PATCH', 'PUT'] },
   { prefix: 'seller/orders/', methods: ['GET'] },
+  { prefix: 'seller/notifications/preferences/', methods: ['GET', 'PATCH'] },
+  { prefix: 'seller/notifications/', methods: ['GET'] },
 ]
 
 const SEGMENT = /^[A-Za-z0-9_-]+$/ // rejects '..', '.', encoded slashes, empty and anything else surprising

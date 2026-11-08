@@ -19,12 +19,12 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairView, TokenRefreshView
 
 from . import cart as cart_logic
-from .models import BuyerProfile, Order, OrderLine, Product, SellerProfile
+from .models import (BuyerProfile, NotificationDelivery, Order, OrderLine, Product, SellerNotificationPreference, SellerProfile)
 from .failopen import FailOpenMixin
 from .inputs import mapping_or_empty
 from .pricing import shipping_for
 from .serializers import (CartLinesSerializer, CreateOrderSerializer, OrderSerializer, OrderTrackingSerializer, ProductSerializer, SellerOrderSerializer,
-                          ProfileSerializer, RegisterSerializer, SellerProductSerializer)
+                          ProfileSerializer, RegisterSerializer, SellerProductSerializer, SellerNotificationPreferenceSerializer, SellerNotificationDeliverySerializer)
 from .services import PENDING_ORDER_TTL_MINUTES, release_order
 
 logger = logging.getLogger(__name__)
@@ -206,6 +206,39 @@ class SellerOrderListView(generics.ListAPIView):
                 .filter(status__in=[Order.Status.PAID, Order.Status.FULFILLED],
                         lines__product__seller=seller)
                 .distinct()[:50])
+
+
+
+class SellerNotificationPreferencesView(APIView):
+    permission_classes = [IsAuthenticated, IsApprovedSeller]
+
+    def get(self, request):
+        seller = request.user.seller_profile
+        prefs, _ = SellerNotificationPreference.objects.get_or_create(seller=seller)
+        from .notification_service import _enabled_channels
+        data = SellerNotificationPreferenceSerializer(prefs).data
+        data['configured_channels'] = _enabled_channels()
+        return Response(data)
+
+    def patch(self, request):
+        seller = request.user.seller_profile
+        prefs, _ = SellerNotificationPreference.objects.get_or_create(seller=seller)
+        serializer = SellerNotificationPreferenceSerializer(prefs, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        data = SellerNotificationPreferenceSerializer(serializer.instance).data
+        from .notification_service import _enabled_channels
+        data['configured_channels'] = _enabled_channels()
+        return Response(data)
+
+
+class SellerNotificationListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated, IsApprovedSeller]
+    serializer_class = SellerNotificationDeliverySerializer
+
+    def get_queryset(self):
+        seller = self.request.user.seller_profile
+        return NotificationDelivery.objects.filter(seller=seller).select_related('event').order_by('-created_at')[:50]
 
 
 # ---------------------------------------------------------------------------------- cart

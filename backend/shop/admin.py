@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BuyerProfile, Order, OrderLine, Product, SellerProfile
+from .models import (BuyerProfile, NotificationDelivery, NotificationEvent, Order, OrderLine, Product, SellerNotificationPreference, SellerProfile)
 
 
 @admin.register(Product)
@@ -84,3 +84,25 @@ class OrderAdmin(admin.ModelAdmin):
             self.log_change(request, order, 'Marked fulfilled (paid -> fulfilled)')    # audit trail: queryset.update() would skip it
             moved += 1
         self.message_user(request, f'{moved} order(s) marked fulfilled; {skipped} skipped because they were not paid.')
+
+
+@admin.register(SellerNotificationPreference)
+class SellerNotificationPreferenceAdmin(admin.ModelAdmin):
+    list_display = ('seller', 'phone', 'phone_verified', 'email_enabled', 'whatsapp_opt_in', 'sms_opt_in')
+    list_filter = ('phone_verified', 'email_enabled', 'whatsapp_opt_in', 'sms_opt_in')
+    search_fields = ('seller__display_name', 'seller__user__email', 'phone')
+
+
+@admin.register(NotificationEvent)
+class NotificationEventAdmin(admin.ModelAdmin):
+    list_display = ('id', 'order', 'event_type', 'status', 'attempts', 'created_at')
+    list_filter = ('status', 'event_type')
+    readonly_fields = [field.name for field in NotificationEvent._meta.fields]
+
+
+@admin.register(NotificationDelivery)
+class NotificationDeliveryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'event', 'seller', 'channel', 'recipient', 'status', 'attempt_count', 'sent_at')
+    list_filter = ('channel', 'status')
+    search_fields = ('recipient', 'seller__display_name', 'event__order_id')
+    readonly_fields = [field.name for field in NotificationDelivery._meta.fields]

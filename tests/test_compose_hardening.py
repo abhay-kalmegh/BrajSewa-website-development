@@ -55,6 +55,11 @@ class ComposeHardeningTests(unittest.TestCase):
         self.assertIn('RAZORPAY_KEY_SECRET', SERVICES['scheduler']['environment'])      # reconcile_payments needs the API key
         self.assertTrue(SERVICES['backend']['environment']['RAZORPAY_WEBHOOK_SECRET'])  # the web process does receive webhooks
 
+    def test_scheduler_runs_the_outbox_worker_entrypoint(self):
+        self.assertEqual(SERVICES['scheduler']['command'], ['python', 'scripts/scheduler.py'])
+        for key in ('EMAIL_HOST', 'WHATSAPP_ACCESS_TOKEN', 'MSG91_AUTH_KEY'):
+            self.assertIn(key, SERVICES['scheduler']['environment'])
+
     def test_published_ports_are_loopback_by_default(self):
         for name in ('backend', 'frontend'):
             for port in SERVICES[name]['ports']:
