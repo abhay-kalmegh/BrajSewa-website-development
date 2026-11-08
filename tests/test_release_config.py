@@ -60,11 +60,12 @@ class ReleaseConfigTests(unittest.TestCase):
 
     def test_scheduler_expires_orders_and_reconciles_payments(self):
         command = ' '.join(compose()['scheduler']['command'])
-        self.assertIn('expire_orders', command)
-        self.assertIn('reconcile_payments', command)
-        self.assertIn('|| true', command)          # a reported discrepancy must not stop the loop that expires orders
-        self.assertIn('$$', command)               # compose requires `$$` for a literal `$`
-        self.assertIn('flushexpiredtokens', command)   # the JWT blacklist table needs a daily clean-up
+        self.assertEqual(command, 'python scripts/scheduler.py')
+        with open('backend/scripts/scheduler.py') as handle:
+            scheduler = handle.read()
+        for task in ('process_notification_outbox', 'expire_orders', 'reconcile_payments', 'flushexpiredtokens'):
+            self.assertIn(task, scheduler)
+        self.assertIn('check=False', scheduler)  # one provider/maintenance failure must not stop later passes
 
     def test_cookie_and_token_lifetimes_come_from_one_setting(self):
         services = compose()
