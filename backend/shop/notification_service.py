@@ -33,27 +33,39 @@ def _seller_amount(order, seller):
 
 
 def _ensure_deliveries(event):
+    """Create eligible deliveries and report channels waiting for provider configuration."""
     order = event.order
+    waiting_for_provider = False
     seller_ids = order.lines.exclude(product__seller__isnull=True).values_list('product__seller_id', flat=True).distinct()
     for seller_id in seller_ids:
-        seller = event.order.lines.filter(product__seller_id=seller_id).first().product.seller
+        seller = order.lines.filter(product__seller_id=seller_id).first().product.seller
         prefs, _ = SellerNotificationPreference.objects.get_or_create(seller=seller)
         channels = _enabled_channels()
-        if prefs.email_enabled and seller.user.email and channels['email']:
-            NotificationDelivery.objects.get_or_create(
-                event=event, seller=seller, channel=NotificationDelivery.Channel.EMAIL,
-                defaults={'recipient': seller.user.email},
-            )
-        if prefs.phone_verified and prefs.phone and prefs.whatsapp_opt_in and channels['whatsapp']:
-            NotificationDelivery.objects.get_or_create(
-                event=event, seller=seller, channel=NotificationDelivery.Channel.WHATSAPP,
-                defaults={'recipient': prefs.phone},
-            )
-        if prefs.phone_verified and prefs.phone and prefs.sms_opt_in and channels['sms']:
-            NotificationDelivery.objects.get_or_create(
-                event=event, seller=seller, channel=NotificationDelivery.Channel.SMS,
-                defaults={'recipient': prefs.phone},
-            )
+        if prefs.email_enabled and seller.user.email:
+            if channels['email']:
+                NotificationDelivery.objects.get_or_create(
+                    event=event, seller=seller, channel=NotificationDelivery.Channel.EMAIL,
+                    defaults={'recipient': seller.user.email},
+                )
+            else:
+                waiting_for_provider = True
+        if prefs.phone_verified and prefs.phone and prefs.whatsapp_opt_in:
+            if channels['whatsapp']:
+                NotificationDelivery.objects.get_or_create(
+                    event=event, seller=seller, channel=NotificationDelivery.Channel.WHATSAPP,
+                    defaults={'recipient': prefs.phone},
+                )
+            else:
+                waiting_for_provider = True
+        if prefs.phone_verified and prefs.phone and prefs.sms_opt_in:
+            if channels['sms']:
+                NotificationDelivery.objects.get_or_create(
+                    event=event, seller=seller, channel=NotificationDelivery.Channel.SMS,
+                    defaults={'recipient': prefs.phone},
+                )
+            else:
+                waiting_for_provider = True
+    return waiting_for_provider
 
 
 def _order_message(delivery):
@@ -167,7 +179,7 @@ def process_notification_outbox(limit=100):
         status=NotificationEvent.Status.PENDING,
     ).select_related('order').order_by('created_at')[:limit]
     for event in events:
-        _ensure_deliveries(event)
+        waiting_for_provider = _ensure_deliveries(event)
         deliveries = NotificationDelivery.objects.filter(event=event).order_by('created_at')
         for delivery in deliveries:
             if delivery.status in (NotificationDelivery.Status.SENT, NotificationDelivery.Status.SKIPPED):
@@ -204,8 +216,14 @@ def process_notification_outbox(limit=100):
         remaining = NotificationDelivery.objects.filter(event=event).exclude(
             status__in=[NotificationDelivery.Status.SENT, NotificationDelivery.Status.SKIPPED],
         ).filter(attempt_count__lt=MAX_ATTEMPTS).exists()
-        if not remaining:
+        if waiting_for_provider:
+            NotificationEvent.objects.filter(pk=event.pk).update(
+                last_error='Waiting for configuration of an enabled notification provider.',
+                updated_at=timezone.now(),
+            )
+        elif not remaining:
             NotificationEvent.objects.filter(pk=event.pk).update(
                 status=NotificationEvent.Status.PROCESSED, attempts=F('attempts') + 1, last_error='',
+                updated_at=timezone.now(),
             )
     return processed
