@@ -170,7 +170,6 @@ def process_notification_outbox(limit=100):
     NotificationDelivery.objects.filter(
         status=NotificationDelivery.Status.SENDING,
         updated_at__lt=now - timedelta(minutes=10),
-        attempt_count__lt=MAX_ATTEMPTS,
     ).update(status=NotificationDelivery.Status.FAILED, error_message='Recovered after interrupted delivery.', updated_at=now)
 
     processed = 0
