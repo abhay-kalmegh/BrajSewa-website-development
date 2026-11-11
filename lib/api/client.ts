@@ -79,7 +79,13 @@ export const login = (payload: { email: string; password: string }) =>
   request<{ ok: true }>('/api/auth/login', { method: 'POST', body: json(payload) })
 
 export const register = (payload: { email: string; password: string; firstName: string; lastName?: string; phone?: string }) =>
-  request<{ user: Profile }>('/api/auth/register', { method: 'POST', body: json(payload) })
+  request<{ detail: string }>('/api/auth/register', { method: 'POST', body: json(payload) })
+
+export const resendEmailVerification = (email: string) =>
+  request<{ detail: string }>('/api/auth/email-verification/resend', { method: 'POST', body: json({ email }) })
+
+export const confirmEmailVerification = (payload: { uid: string; token: string }) =>
+  request<{ detail: string }>('/api/auth/email-verification/confirm', { method: 'POST', body: json(payload) })
 
 export const requestPasswordReset = (email: string) =>
   request<{ detail: string }>('/api/auth/password-reset/request', { method: 'POST', body: json({ email }) })

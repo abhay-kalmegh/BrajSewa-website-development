@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { djangoFetch, guardMutation, jsonError, setAuthCookies } from '@/lib/api/server'
+import { djangoFetch, guardMutation, jsonError } from '@/lib/api/server'
 
 type RegisterBody = { email?: unknown; password?: unknown; firstName?: unknown; lastName?: unknown; phone?: unknown }
 
@@ -41,7 +41,6 @@ export async function POST(req: Request) {
   }
   if (!upstream.ok) return jsonError('Sign-up is temporarily unavailable.', 502)
 
-  const { access, refresh, user } = (await upstream.json()) as { access: string; refresh: string; user: unknown }
-  await setAuthCookies({ access, refresh })
-  return NextResponse.json({ user }, { status: 201, headers: { 'Cache-Control': 'no-store' } })
+  const result = await upstream.json().catch(() => ({}))
+  return NextResponse.json(result, { status: 201, headers: { 'Cache-Control': 'no-store' } })
 }

@@ -3,7 +3,7 @@ import logging
 from datetime import timedelta
 
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth.tokens import default_token_generator
+from django.contrib.auth.tokens import PasswordResetTokenGenerator, default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
 from django.utils.encoding import force_bytes, force_str
@@ -84,10 +84,32 @@ class PasswordResetEmailThrottle(FailOpenMixin, SimpleRateThrottle):
         return self.cache_format % {'scope': self.scope, 'ident': ident}
 
 
+class EmailVerificationTokenGenerator(PasswordResetTokenGenerator):
+    def _make_hash_value(self, user, timestamp):
+        return f'{super()._make_hash_value(user, timestamp)}-{user.is_active}'
+
+
+email_verification_token_generator = EmailVerificationTokenGenerator()
+
+
+class EmailVerificationEmailThrottle(PasswordResetEmailThrottle):
+    scope = 'email_verification_email'
+
+
+class EmailVerificationRequired(APIException):
+    status_code = status.HTTP_403_FORBIDDEN
+    default_detail = 'Please verify your email before signing in.'
+    default_code = 'email_verification_required'
+
+
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         field = self.username_field
-        attrs[field] = str(attrs.get(field, '')).strip().lower()
+        username = str(attrs.get(field, '')).strip().lower()
+        attrs[field] = username
+        user = get_user_model().objects.filter(email__iexact=username).first()
+        if user and not user.is_active and user.check_password(str(attrs.get('password', ''))):
+            raise EmailVerificationRequired()
         return super().validate(attrs)
 
 
@@ -105,6 +127,22 @@ class LogoutView(TokenBlacklistView):
     throttle_scope = 'auth'
 
 
+def send_verification_email(user):
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = email_verification_token_generator.make_token(user)
+    verify_url = f"{settings.PUBLIC_SITE_URL.rstrip('/')}/verify-email?uid={uid}&token={token}"
+    try:
+        send_mail(
+            'Verify your BrajSewa email address',
+            f'Confirm your email address within one day to activate your account:\n\n{verify_url}\n\nIf you did not create this account, you can ignore this email.',
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.warning('Email verification delivery failed')
+
+
 class RegisterView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -120,7 +158,7 @@ class RegisterView(APIView):
                 if User.objects.filter(Q(username__iexact=data['email']) | Q(email__iexact=data['email'])).exists():
                     raise IntegrityError
                 user = User.objects.create_user(
-                    username=data['email'], email=data['email'], password=data['password'],
+                    username=data['email'], email=data['email'], password=data['password'], is_active=False,
                     first_name=data['firstName'], last_name=data.get('lastName', ''))
                 if data['role'] == 'seller':
                     SellerProfile.objects.create(user=user, display_name=user.get_full_name() or user.email)
@@ -128,9 +166,49 @@ class RegisterView(APIView):
                     BuyerProfile.objects.create(user=user, phone=data.get('phone', ''))
         except IntegrityError:
             return Response({'detail': 'An account with this email already exists.'}, status=status.HTTP_409_CONFLICT)
-        refresh = RefreshToken.for_user(user)
-        return Response({'access': str(refresh.access_token), 'refresh': str(refresh),
-                         'user': ProfileSerializer(user).data}, status=status.HTTP_201_CREATED)
+        send_verification_email(user)
+        return Response({'detail': 'Check your email for a verification link to activate your account.'},
+                        status=status.HTTP_201_CREATED)
+
+
+class EmailVerificationRequestView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_scope = 'email_verification'
+    throttle_classes = [*APIView.throttle_classes, EmailVerificationEmailThrottle]
+
+    def post(self, request):
+        email = str(mapping_or_empty(request.data).get('email', '')).strip().lower()
+        if email and len(email) <= 254:
+            user = get_user_model().objects.filter(email__iexact=email, is_active=False).first()
+            if user:
+                send_verification_email(user)
+        return Response({'detail': 'If an account is awaiting verification, a new link will be sent.'},
+                        status=status.HTTP_200_OK)
+
+
+class EmailVerificationConfirmView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_scope = 'email_verification'
+
+    def post(self, request):
+        data = mapping_or_empty(request.data)
+        uid = data.get('uid')
+        token = data.get('token')
+        invalid = {'detail': 'This email verification link is invalid or expired.'}
+        if not isinstance(uid, str) or not isinstance(token, str) or len(uid) > 128 or len(token) > 128:
+            return Response(invalid, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = get_user_model().objects.get(pk=user_id)
+        except (ValueError, TypeError, OverflowError, get_user_model().DoesNotExist):
+            return Response(invalid, status=status.HTTP_400_BAD_REQUEST)
+        if user.is_active or not email_verification_token_generator.check_token(user, token):
+            return Response(invalid, status=status.HTTP_400_BAD_REQUEST)
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+        return Response({'detail': 'Email verified. You can sign in now.'}, status=status.HTTP_200_OK)
 
 
 class PasswordResetRequestView(APIView):
