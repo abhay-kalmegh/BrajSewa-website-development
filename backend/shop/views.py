@@ -2,6 +2,13 @@ import hashlib
 import logging
 from datetime import timedelta
 
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.mail import send_mail
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+
 import razorpay
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -16,6 +23,7 @@ from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairView, TokenRefreshView
 
 from . import cart as cart_logic
@@ -62,6 +70,17 @@ class LoginEmailThrottle(FailOpenMixin, SimpleRateThrottle):
         if not username:
             return None
         ident = hashlib.sha256(username.encode()).hexdigest()  # safe for any cache backend
+        return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
+class PasswordResetEmailThrottle(FailOpenMixin, SimpleRateThrottle):
+    scope = 'password_reset_email'
+
+    def get_cache_key(self, request, view):
+        email = str(mapping_or_empty(request.data).get('email', '')).strip().lower()
+        if not email:
+            return None
+        ident = hashlib.sha256(email.encode()).hexdigest()
         return self.cache_format % {'scope': self.scope, 'ident': ident}
 
 
@@ -112,6 +131,64 @@ class RegisterView(APIView):
         refresh = RefreshToken.for_user(user)
         return Response({'access': str(refresh.access_token), 'refresh': str(refresh),
                          'user': ProfileSerializer(user).data}, status=status.HTTP_201_CREATED)
+
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_scope = 'password_reset'
+    throttle_classes = [*APIView.throttle_classes, PasswordResetEmailThrottle]
+
+    def post(self, request):
+        email = str(mapping_or_empty(request.data).get('email', '')).strip().lower()
+        User = get_user_model()
+        user = User.objects.filter(email__iexact=email, is_active=True).first() if email else None
+        if user:
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            reset_url = f"{settings.PUBLIC_SITE_URL.rstrip('/')}/reset-password?uid={uid}&token={token}"
+            try:
+                send_mail(
+                    'Reset your BrajSewa password',
+                    f'Use this link to choose a new password. It expires after one day:\n\n{reset_url}\n\nIf you did not request this, you can ignore this email.',
+                    settings.DEFAULT_FROM_EMAIL,
+                    [user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                logger.warning('Password reset email delivery failed')
+        return Response({'detail': 'If an account exists for that email, a reset link will be sent.'},
+                        status=status.HTTP_200_OK)
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_scope = 'password_reset'
+
+    def post(self, request):
+        data = mapping_or_empty(request.data)
+        uid = data.get('uid')
+        token = data.get('token')
+        password = data.get('password')
+        if not all(isinstance(value, str) for value in (uid, token, password)) or len(password) > 256:
+            return Response({'detail': 'This password reset link is invalid or expired.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = get_user_model().objects.get(pk=user_id, is_active=True)
+        except (ValueError, TypeError, OverflowError, get_user_model().DoesNotExist):
+            return Response({'detail': 'This password reset link is invalid or expired.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not default_token_generator.check_token(user, token):
+            return Response({'detail': 'This password reset link is invalid or expired.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            validate_password(password, user)
+        except DjangoValidationError as error:
+            return Response({'password': list(error.messages)}, status=status.HTTP_400_BAD_REQUEST)
+        user.set_password(password)
+        user.save(update_fields=['password'])
+        for outstanding in OutstandingToken.objects.filter(user=user, blacklistedtoken__isnull=True):
+            BlacklistedToken.objects.get_or_create(token=outstanding)
+        return Response({'detail': 'Your password has been reset. You can now sign in.'}, status=status.HTTP_200_OK)
 
 
 class MeView(APIView):

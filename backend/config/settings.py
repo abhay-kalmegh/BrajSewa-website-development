@@ -120,6 +120,8 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'auth': '20/min',          # per IP: login, register, refresh, logout
         'login_email': '8/min',    # per target account, regardless of IP
+        'password_reset': '10/hour',     # per source IP
+        'password_reset_email': '3/hour',  # per target account, regardless of IP
         'orders': '20/hour',       # per user
         'payments': '60/hour',     # per user
         'quote': '120/min',        # per IP: cart pricing (public)
@@ -212,4 +214,6 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', True)
 EMAIL_USE_SSL = env_bool('EMAIL_USE_SSL', False)
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'BrajSewa <no-reply@brajsewa.com>')
+PUBLIC_SITE_URL = os.getenv('PUBLIC_SITE_URL', 'https://brajsewa.com').rstrip('/')
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
 EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))
