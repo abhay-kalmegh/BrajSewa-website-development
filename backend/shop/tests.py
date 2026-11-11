@@ -63,13 +63,45 @@ class SerializerTests(ShopTestCase):
 
 
 class AuthTests(ShopTestCase):
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
     def test_register_normalises_email_and_rejects_duplicates_case_insensitively(self):
         payload = {'email': 'New@Example.com', 'password': PASSWORD, 'firstName': 'N'}
-        r = self.client.post('/api/v1/auth/register/', payload, format='json')
-        self.assertEqual(r.status_code, 201, r.data)
-        self.assertEqual(r.data['user']['email'], 'new@example.com')
+        response = self.client.post('/api/v1/auth/register/', payload, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertIn('verification link', response.data['detail'])
+        user = get_user_model().objects.get(email='new@example.com')
+        self.assertFalse(user.is_active)
+        self.assertEqual(mail.outbox[0].to, ['new@example.com'])
+        self.assertIn('/verify-email?uid=', mail.outbox[0].body)
         again = self.client.post('/api/v1/auth/register/', {**payload, 'email': 'NEW@example.com'}, format='json')
         self.assertEqual(again.status_code, 409)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_email_verification_is_required_and_link_is_single_use(self):
+        response = self.client.post('/api/v1/auth/register/',
+                                    {'email': 'new@example.com', 'password': PASSWORD, 'firstName': 'N'},
+                                    format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        link = re.search(r'https://\S+', mail.outbox[0].body).group(0)
+        query = parse_qs(urlparse(link).query)
+        payload = {'uid': query['uid'][0], 'token': query['token'][0]}
+        login_payload = {'username': 'new@example.com', 'password': PASSWORD}
+        self.assertEqual(self.client.post('/api/v1/auth/token/', login_payload, format='json').status_code, 403)
+        self.assertEqual(self.client.post('/api/v1/auth/token/', {**login_payload, 'password': 'wrong'}, format='json').status_code, 401)
+        confirmed = self.client.post('/api/v1/auth/email-verification/confirm/', payload, format='json')
+        self.assertEqual(confirmed.status_code, 200, confirmed.data)
+        self.assertEqual(self.client.post('/api/v1/auth/email-verification/confirm/', payload, format='json').status_code, 400)
+        self.assertEqual(self.client.post('/api/v1/auth/token/', login_payload, format='json').status_code, 200)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_verification_resend_does_not_disclose_account_state(self):
+        self.client.post('/api/v1/auth/register/',
+                         {'email': 'new@example.com', 'password': PASSWORD, 'firstName': 'N'}, format='json')
+        known = self.client.post('/api/v1/auth/email-verification/resend/', {'email': 'NEW@example.com'}, format='json')
+        unknown = self.client.post('/api/v1/auth/email-verification/resend/', {'email': 'missing@example.com'}, format='json')
+        self.assertEqual(known.status_code, 200)
+        self.assertEqual(known.data, unknown.data)
+        self.assertEqual(len(mail.outbox), 2)
 
     def test_register_enforces_password_validators(self):
         r = self.client.post('/api/v1/auth/register/',

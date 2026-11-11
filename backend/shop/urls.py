@@ -3,6 +3,7 @@ from django.urls import path
 from .payments import RazorpayVerifyView, RazorpayWebhookView
 from .views import (CartMergeView, CartQuoteView, CartView, LoginView, LogoutView, MeView, OrderCollectionView,
                     PasswordResetRequestView, PasswordResetConfirmView,
+                    EmailVerificationRequestView, EmailVerificationConfirmView,
                     BundlePackingView, OrderDetailView, ProductDetailView, ProductListView, RefreshView, RegisterView,
                     OrderTrackingView, SellerAccessView, SellerOrderListView, SellerProductDetailView, SellerProductListCreateView, SellerNotificationPreferencesView, SellerNotificationListView)
 
@@ -19,6 +20,8 @@ urlpatterns = [
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('auth/password-reset/request/', PasswordResetRequestView.as_view(), name='password-reset-request'),
     path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
+    path('auth/email-verification/resend/', EmailVerificationRequestView.as_view(), name='email-verification-resend'),
+    path('auth/email-verification/confirm/', EmailVerificationConfirmView.as_view(), name='email-verification-confirm'),
     path('account/me/', MeView.as_view(), name='account-me'),
     path('seller/access/', SellerAccessView.as_view(), name='seller-access'),
     path('seller/products/', SellerProductListCreateView.as_view(), name='seller-products'),

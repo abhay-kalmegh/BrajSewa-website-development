@@ -35,9 +35,11 @@ export function AuthForm({ register: isRegister = false }: { register?: boolean 
           lastName: value('lastName'),
           phone: value('phone'),
         })
-      } else {
-        await login({ email: value('email'), password: String(form.get('password') ?? '') })
+        router.push(`/verify-email?email=${encodeURIComponent(value('email'))}`)
+        router.refresh()
+        return
       }
+      await login({ email: value('email'), password: String(form.get('password') ?? '') })
       // Load the new session first: that is what makes the header update and triggers the cart merge.
       await refresh()
       router.push(destinationAfterAuth())
@@ -83,7 +85,7 @@ export function AuthForm({ register: isRegister = false }: { register?: boolean 
           <span key={message} className="text-xs font-normal text-[#d66a83]">{message}</span>
         ))}
       </label>
-      {!isRegister && <Link href="/forgot-password" className="-mt-2 self-end text-sm font-semibold text-[#667a52]">Forgot password?</Link>}
+      {!isRegister && <div className="-mt-2 flex justify-between gap-4 text-sm font-semibold text-[#667a52]"><Link href="/forgot-password">Forgot password?</Link><Link href="/verify-email">Verify email</Link></div>}
       {error && <p role="alert" className="rounded-xl bg-[#d66a83]/10 px-4 py-3 text-sm text-[#a43a52]">{error}</p>}
       <button type="submit" disabled={pending}
         className="rounded-full bg-[#d99a2b] px-5 py-4 text-sm font-bold text-white disabled:opacity-60">

@@ -122,6 +122,8 @@ REST_FRAMEWORK = {
         'login_email': '8/min',    # per target account, regardless of IP
         'password_reset': '10/hour',     # per source IP
         'password_reset_email': '3/hour',  # per target account, regardless of IP
+        'email_verification': '10/hour',
+        'email_verification_email': '3/hour',  # per target account
         'orders': '20/hour',       # per user
         'payments': '60/hour',     # per user
         'quote': '120/min',        # per IP: cart pricing (public)

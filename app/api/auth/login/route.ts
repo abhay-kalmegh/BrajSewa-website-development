@@ -28,6 +28,7 @@ export async function POST(req: Request) {
   }
 
   if (upstream.status === 429) return jsonError('Too many attempts. Please wait a minute and try again.', 429)
+  if (upstream.status === 403) return jsonError('Please verify your email before signing in.', 403)
   if (upstream.status >= 500) return jsonError('Sign-in is temporarily unavailable.', 502)
   // One message for unknown email and wrong password, so the form can't be used to find accounts.
   if (!upstream.ok) return jsonError('Invalid email or password.', 401)
