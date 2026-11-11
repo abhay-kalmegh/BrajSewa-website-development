@@ -1,6 +1,8 @@
 import hashlib
 import hmac
 import json
+import re
+from urllib.parse import parse_qs, urlparse
 from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
@@ -16,6 +18,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework.throttling import SimpleRateThrottle
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import NotificationDelivery, NotificationEvent, Order, Product, SellerNotificationPreference, SellerProfile
 from .serializers import CustomerSerializer, ProfileSerializer
@@ -78,6 +81,25 @@ class AuthTests(ShopTestCase):
         r = self.client.post('/api/v1/auth/token/', {'username': 'A@B.com', 'password': PASSWORD}, format='json')
         self.assertEqual(r.status_code, 200, r.data)
         self.assertIn('access', r.data)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_password_reset_is_non_enumerating_single_use_and_updates_password(self):
+        known = self.client.post('/api/v1/auth/password-reset/request/', {'email': 'A@B.COM'}, format='json')
+        unknown = self.client.post('/api/v1/auth/password-reset/request/', {'email': 'missing@example.com'}, format='json')
+        self.assertEqual(known.status_code, 200)
+        self.assertEqual(known.data, unknown.data)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['a@b.com'])
+        link = re.search(r'https://\S+', mail.outbox[0].body).group(0)
+        query = parse_qs(urlparse(link).query)
+        refresh = str(RefreshToken.for_user(self.user))
+        payload = {'uid': query['uid'][0], 'token': query['token'][0], 'password': 'Fresh!Password2026'}
+        response = self.client.post('/api/v1/auth/password-reset/confirm/', payload, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(payload['password']))
+        self.assertEqual(self.client.post('/api/v1/auth/token/refresh/', {'refresh': refresh}, format='json').status_code, 401)
+        self.assertEqual(self.client.post('/api/v1/auth/password-reset/confirm/', payload, format='json').status_code, 400)
 
     def test_login_is_throttled_per_account(self):
         codes = [self.client.post('/api/v1/auth/token/', {'username': 'a@b.com', 'password': 'wrong'},

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ApiError, login, register } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
 import { safeNext } from '@/lib/safe-redirect'
@@ -82,6 +83,7 @@ export function AuthForm({ register: isRegister = false }: { register?: boolean 
           <span key={message} className="text-xs font-normal text-[#d66a83]">{message}</span>
         ))}
       </label>
+      {!isRegister && <Link href="/forgot-password" className="-mt-2 self-end text-sm font-semibold text-[#667a52]">Forgot password?</Link>}
       {error && <p role="alert" className="rounded-xl bg-[#d66a83]/10 px-4 py-3 text-sm text-[#a43a52]">{error}</p>}
       <button type="submit" disabled={pending}
         className="rounded-full bg-[#d99a2b] px-5 py-4 text-sm font-bold text-white disabled:opacity-60">

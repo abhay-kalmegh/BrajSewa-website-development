@@ -81,6 +81,12 @@ export const login = (payload: { email: string; password: string }) =>
 export const register = (payload: { email: string; password: string; firstName: string; lastName?: string; phone?: string }) =>
   request<{ user: Profile }>('/api/auth/register', { method: 'POST', body: json(payload) })
 
+export const requestPasswordReset = (email: string) =>
+  request<{ detail: string }>('/api/auth/password-reset/request', { method: 'POST', body: json({ email }) })
+
+export const confirmPasswordReset = (payload: { uid: string; token: string; password: string }) =>
+  request<{ detail: string }>('/api/auth/password-reset/confirm', { method: 'POST', body: json(payload) })
+
 export const logout = () => request<{ ok: true }>('/api/auth/logout', { method: 'POST' })
 
 export const getSession = () => request<{ user: Profile | null }>('/api/auth/session')
