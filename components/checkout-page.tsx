@@ -17,12 +17,13 @@ const EMPTY = { firstName: '', lastName: '', email: '', phone: '', address: '', 
 
 export function CheckoutPage() {
   const router = useRouter()
-  const { user, status } = useRequireAuth()
+  const { user, status, refresh } = useRequireAuth()
   const { items, summary, syncing, clear } = useCart()
   const [form, setForm] = useState(EMPTY)
   const [saveAddress, setSaveAddress] = useState(true)
   const [stage, setStage] = useState<Stage>('idle')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [info, setInfo] = useState('')
   const [scriptReady, setScriptReady] = useState(false)
   const prefilled = useRef(false)
@@ -44,6 +45,10 @@ export function CheckoutPage() {
 
   const set = (field: keyof typeof EMPTY) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((current) => ({ ...current, [field]: event.target.value }))
+  const fieldError = (field: keyof typeof EMPTY) => {
+    const snakeCase = field.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
+    return fieldErrors[`customer.${field}`]?.[0] ?? fieldErrors[`customer.${snakeCase}`]?.[0] ?? fieldErrors[field]?.[0] ?? fieldErrors[snakeCase]?.[0]
+  }
 
   function openRazorpay(order: CreateOrderResponse) {
     const Razorpay = window.Razorpay
@@ -105,6 +110,7 @@ export function CheckoutPage() {
     event.preventDefault()
     if (stage !== 'idle' || items.length === 0) return
     setError('')
+    setFieldErrors({})
     setInfo('')
     setStage('creating')
     try {
@@ -117,14 +123,21 @@ export function CheckoutPage() {
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 401) { router.replace('/login?next=/checkout'); return }
       setError(caught instanceof Error ? caught.message : 'Something went wrong. Please try again.')
+      if (caught instanceof ApiError) setFieldErrors(caught.fieldErrors)
       setStage('idle')
     }
   }
 
   const busy = stage !== 'idle'
 
+  if (status === 'error' && !user) {
+    return <Shell><div className="mt-10 rounded-3xl bg-white p-8 text-center" role="alert">
+      <p className="text-[#635951]">We couldn&apos;t verify your session. The server may be waking up.</p>
+      <button type="button" onClick={() => void refresh()} className="mt-5 rounded-full bg-[#667a52] px-5 py-3 text-sm font-semibold text-white">Try again</button>
+    </div></Shell>
+  }
   if (status === 'loading' || !user) {
-    return <Shell><p className="mt-10 text-[#24201d]/60">Loading your checkout…</p></Shell>
+    return <Shell><p className="mt-10 text-[#24201d]/60" role="status">Loading your checkout…</p></Shell>
   }
   if (stage === 'confirming') {
     return <Shell><div className="mt-10 rounded-3xl bg-white p-10 text-center"><h2 className="font-serif text-3xl">Confirming your payment…</h2><p className="mt-3 text-[#24201d]/60">Please don&apos;t close this page.</p></div></Shell>
@@ -150,28 +163,28 @@ export function CheckoutPage() {
           <h2 className="font-serif text-2xl">Contact information</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-2 text-sm font-semibold">Email
-              <input required type="email" autoComplete="email" value={form.email} onChange={set('email')} className={inputClass} /></label>
+              <input required type="email" autoComplete="email" value={form.email} onChange={set('email')} aria-invalid={Boolean(fieldError('email'))} className={inputClass} />{fieldError('email') && <span className="text-xs font-normal text-[#a53d2e]">{fieldError('email')}</span>}</label>
             <label className="flex flex-col gap-2 text-sm font-semibold">Mobile number
               <input required type="tel" inputMode="tel" autoComplete="tel" pattern="[0-9+\s\-]{10,15}" title="Enter a valid mobile number"
-                value={form.phone} onChange={set('phone')} className={inputClass} /></label>
+                value={form.phone} onChange={set('phone')} aria-invalid={Boolean(fieldError('phone'))} className={inputClass} />{fieldError('phone') && <span className="text-xs font-normal text-[#a53d2e]">{fieldError('phone')}</span>}</label>
           </div>
           <h2 className="mt-2 font-serif text-2xl">Delivery address</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-2 text-sm font-semibold">First name
-              <input required autoComplete="given-name" value={form.firstName} onChange={set('firstName')} className={inputClass} /></label>
+              <input required autoComplete="given-name" value={form.firstName} onChange={set('firstName')} aria-invalid={Boolean(fieldError('firstName'))} className={inputClass} />{fieldError('firstName') && <span className="text-xs font-normal text-[#a53d2e]">{fieldError('firstName')}</span>}</label>
             <label className="flex flex-col gap-2 text-sm font-semibold">Last name
-              <input autoComplete="family-name" value={form.lastName} onChange={set('lastName')} className={inputClass} /></label>
+              <input autoComplete="family-name" value={form.lastName} onChange={set('lastName')} aria-invalid={Boolean(fieldError('lastName'))} className={inputClass} />{fieldError('lastName') && <span className="text-xs font-normal text-[#a53d2e]">{fieldError('lastName')}</span>}</label>
           </div>
           <label className="flex flex-col gap-2 text-sm font-semibold">Address
-            <textarea required rows={3} autoComplete="street-address" value={form.address} onChange={set('address')} className={`${inputClass} resize-none`} /></label>
+            <textarea required rows={3} autoComplete="street-address" value={form.address} onChange={set('address')} aria-invalid={Boolean(fieldError('address'))} className={`${inputClass} resize-none`} />{fieldError('address') && <span className="text-xs font-normal text-[#a53d2e]">{fieldError('address')}</span>}</label>
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="flex flex-col gap-2 text-sm font-semibold">City
-              <input required autoComplete="address-level2" value={form.city} onChange={set('city')} className={inputClass} /></label>
+              <input required autoComplete="address-level2" value={form.city} onChange={set('city')} aria-invalid={Boolean(fieldError('city'))} className={inputClass} />{fieldError('city') && <span className="text-xs font-normal text-[#a53d2e]">{fieldError('city')}</span>}</label>
             <label className="flex flex-col gap-2 text-sm font-semibold">State
-              <input required autoComplete="address-level1" value={form.state} onChange={set('state')} className={inputClass} /></label>
+              <input required autoComplete="address-level1" value={form.state} onChange={set('state')} aria-invalid={Boolean(fieldError('state'))} className={inputClass} />{fieldError('state') && <span className="text-xs font-normal text-[#a53d2e]">{fieldError('state')}</span>}</label>
             <label className="flex flex-col gap-2 text-sm font-semibold">PIN code
               <input required inputMode="numeric" autoComplete="postal-code" pattern="[0-9]{6}" maxLength={6} title="Enter a 6-digit PIN code"
-                value={form.postalCode} onChange={set('postalCode')} className={inputClass} /></label>
+                value={form.postalCode} onChange={set('postalCode')} aria-invalid={Boolean(fieldError('postalCode'))} className={inputClass} />{fieldError('postalCode') && <span className="text-xs font-normal text-[#a53d2e]">{fieldError('postalCode')}</span>}</label>
           </div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={saveAddress} onChange={(event) => setSaveAddress(event.target.checked)} /> Save this address for next time</label>
 

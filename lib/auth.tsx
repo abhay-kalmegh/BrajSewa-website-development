@@ -1,14 +1,18 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { getSession, logout } from '@/lib/api/client'
+import useSWR from 'swr'
+import { getSession, login as loginRequest, logout as logoutRequest } from '@/lib/api/client'
 import type { Profile } from '@/lib/types'
 
 type AuthContextValue = {
   user: Profile | null
-  /** 'loading' until the first session check finishes, so pages don't flash a signed-out state. */
-  status: 'loading' | 'ready'
+  loading: boolean
+  /** 'error' preserves the protected page during a backend outage instead of treating it as a signed-out session. */
+  status: 'loading' | 'ready' | 'error'
+  login: (credentials: { email: string; password: string }) => Promise<Profile | null>
+  logout: () => Promise<void>
   /** Re-check the session (call after login/register). */
   refresh: () => Promise<Profile | null>
   /** Sign out on the server (revokes the refresh token) and locally. */
@@ -20,30 +24,38 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<Profile | null>(null)
-  const [status, setStatus] = useState<'loading' | 'ready'>('loading')
+  const { data: session, error, isLoading, mutate } = useSWR('auth-session', getSession, {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  })
+  const user = session?.user ?? null
+  const status: AuthContextValue['status'] = isLoading ? 'loading' : error ? 'error' : 'ready'
 
   const refresh = useCallback(async () => {
     try {
-      const { user: current } = await getSession()
-      setUser(current)
-      return current
+      const nextSession = await mutate(getSession(), { revalidate: false })
+      return nextSession?.user ?? null
     } catch {
-      return null // upstream hiccup: keep the previous state rather than signing the visitor out
-    } finally {
-      setStatus('ready')
+      return null
     }
-  }, [])
+  }, [mutate])
 
-  useEffect(() => { void refresh() }, [refresh])
+  const login = useCallback(async (credentials: { email: string; password: string }) => {
+    await loginRequest(credentials)
+    return refresh()
+  }, [refresh])
 
   const signOut = useCallback(async () => {
-    try { await logout() } finally { setUser(null) }
-  }, [])
+    try {
+      await logoutRequest()
+    } finally {
+      await mutate({ user: null }, { revalidate: false })
+    }
+  }, [mutate])
 
-  const markSignedOut = useCallback(() => setUser(null), [])
+  const markSignedOut = useCallback(() => { void mutate({ user: null }, { revalidate: false }) }, [mutate])
 
-  const value = useMemo(() => ({ user, status, refresh, signOut, markSignedOut }), [user, status, refresh, signOut, markSignedOut])
+  const value = useMemo(() => ({ user, loading: status === 'loading', status, login, logout: signOut, refresh, signOut, markSignedOut }), [user, status, login, refresh, signOut, markSignedOut])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

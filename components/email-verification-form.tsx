@@ -16,17 +16,20 @@ export function EmailVerificationForm() {
   const [verified, setVerified] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
 
   async function verify() {
     if (pending || !uid || !token) return
     setPending(true)
     setError('')
+    setFieldErrors({})
     try {
       const result = await confirmEmailVerification({ uid, token })
       setVerified(true)
       setMessage(result.detail)
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Email verification is temporarily unavailable.')
+      if (caught instanceof ApiError) setFieldErrors(caught.fieldErrors)
     } finally {
       setPending(false)
     }
@@ -40,11 +43,13 @@ export function EmailVerificationForm() {
     setPending(true)
     setError('')
     setMessage('')
+    setFieldErrors({})
     try {
       const result = await resendEmailVerification(address)
       setMessage(result.detail)
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Email verification is temporarily unavailable.')
+      if (caught instanceof ApiError) setFieldErrors(caught.fieldErrors)
     } finally {
       setPending(false)
     }
@@ -60,7 +65,8 @@ export function EmailVerificationForm() {
     {verified ? <Link href="/login" className="rounded-full bg-[#d99a2b] px-5 py-4 text-center text-sm font-bold text-white">Continue to login</Link> : <form onSubmit={resend} className="flex flex-col gap-4">
       <p className="text-sm leading-6 text-[#24201d]/70">You can request a fresh link if you have not received one or the previous link expired.</p>
       <label className="flex flex-col gap-2 text-sm font-semibold">Email address
-        <input key={email} name="email" type="email" required maxLength={254} autoComplete="email" defaultValue={email} className={inputClass} />
+        <input key={email} name="email" type="email" required maxLength={254} autoComplete="email" defaultValue={email} aria-invalid={Boolean(fieldErrors.email)} className={inputClass} />
+        {fieldErrors.email?.map((message) => <span key={message} className="text-xs font-normal text-[#a43a52]">{message}</span>)}
       </label>
       <button type="submit" disabled={pending} className="rounded-full border border-[#24201d]/15 bg-white px-5 py-4 text-sm font-bold text-[#43583a] disabled:opacity-60">{pending ? 'Sending…' : 'Resend verification link'}</button>
     </form>}

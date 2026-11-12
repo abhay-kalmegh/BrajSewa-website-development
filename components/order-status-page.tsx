@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import useSWR from 'swr'
 import { StatusBadge } from '@/components/order-card'
 import { ApiError, getOrder } from '@/lib/api/client'
 import { useRequireAuth } from '@/lib/auth'
@@ -13,39 +14,29 @@ const POLL_EVERY_MS = 2500
 const MAX_POLLS = 24 // about a minute: the Razorpay webhook normally lands within seconds
 
 export function OrderStatusPage({ id }: { id: string }) {
-  const { user } = useRequireAuth()
-  const [order, setOrder] = useState<OrderView | null>(null)
-  const [problem, setProblem] = useState<'notfound' | 'unavailable' | null>(null)
-  const [gaveUp, setGaveUp] = useState(false)
-  const [checkAgain, setCheckAgain] = useState(0)
+  const { user, status, refresh } = useRequireAuth()
+  const [polls, setPolls] = useState(0)
+  const { data: order, error, mutate, isLoading } = useSWR<OrderView>(user ? `order-status-${id}` : null, () => getOrder(id), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+    refreshInterval: (current) => current?.status === 'pending' && polls < MAX_POLLS ? POLL_EVERY_MS : 0,
+    onSuccess: (current) => {
+      if (current.status === 'pending') setPolls((count) => Math.min(MAX_POLLS, count + 1))
+    },
+  })
+  const problem = error instanceof ApiError && error.status === 404 ? 'notfound' : error ? 'unavailable' : null
+  const gaveUp = Boolean(order?.status === 'pending' && polls >= MAX_POLLS)
+  const checkAgain = () => {
+    setPolls(0)
+    void mutate()
+  }
 
-  useEffect(() => {
-    if (!user) return
-    let cancelled = false
-    let timer: number | undefined
-    let polls = 0
-    setGaveUp(false)
-    async function load() {
-      try {
-        const current = await getOrder(id)
-        if (cancelled) return
-        setOrder(current)
-        setProblem(null)
-        // The payment can be confirmed by the webhook a moment after the customer returns, so keep checking.
-        if (current.status === 'pending') {
-          if (++polls < MAX_POLLS) timer = window.setTimeout(load, POLL_EVERY_MS)
-          else setGaveUp(true)
-        }
-      } catch (error) {
-        if (cancelled) return
-        if (error instanceof ApiError && error.status === 404) setProblem('notfound')
-        else if (++polls < MAX_POLLS) timer = window.setTimeout(load, POLL_EVERY_MS)
-        else setProblem('unavailable')
-      }
-    }
-    void load()
-    return () => { cancelled = true; window.clearTimeout(timer) }
-  }, [id, user, checkAgain])
+  if (status === 'error' && !user) {
+    return <main className="min-h-screen bg-[#fff9f0] px-5 py-10 text-[#24201d]"><div className="mx-auto max-w-3xl"><Message title="We could not check your session" body="The server may be waking up. Please try again." action={<button type="button" onClick={() => void refresh()} className="mt-5 rounded-full bg-[#d99a2b] px-6 py-3 font-bold text-white">Try again</button>} /></div></main>
+  }
+  if (status === 'loading' || !user) {
+    return <main className="min-h-screen bg-[#fff9f0] px-5 py-10 text-[#24201d]"><p role="status" className="mx-auto max-w-3xl">Checking your account…</p></main>
+  }
 
   return (
     <main className="min-h-screen bg-[#fff9f0] px-5 py-10 text-[#24201d] lg:px-8">
@@ -53,9 +44,9 @@ export function OrderStatusPage({ id }: { id: string }) {
         <Link href="/" className="font-serif text-2xl">BrajSewa.com</Link>
         <div className="mt-10">
           {problem === 'notfound' ? <Message title="Order not found" body="We couldn't find that order on your account." />
-            : problem === 'unavailable' ? <Message title="We couldn't load your order" body="Please check your connection and try again." action={<button onClick={() => { setProblem(null); setCheckAgain((n) => n + 1) }} className="mt-5 rounded-full bg-[#d99a2b] px-6 py-3 font-bold text-white">Try again</button>} />
-            : !order ? <p className="text-[#24201d]/60">Loading your order…</p>
-            : <OrderBody order={order} gaveUp={gaveUp} onCheckAgain={() => setCheckAgain((n) => n + 1)} />}
+            : problem === 'unavailable' ? <Message title="We couldn't load your order" body="Please check your connection and try again." action={<button type="button" onClick={checkAgain} className="mt-5 rounded-full bg-[#d99a2b] px-6 py-3 font-bold text-white">Try again</button>} />
+            : !order ? isLoading ? <div role="status" aria-busy="true" aria-label="Loading your order" className="space-y-3"><div className="h-10 animate-pulse rounded-2xl bg-white" /><div className="h-24 animate-pulse rounded-2xl bg-white" /></div> : <p className="text-[#24201d]/60">No order details are available.</p>
+            : <OrderBody order={order} gaveUp={gaveUp} onCheckAgain={checkAgain} />}
         </div>
       </div>
     </main>

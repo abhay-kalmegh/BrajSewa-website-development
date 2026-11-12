@@ -10,6 +10,7 @@ const inputClass = 'rounded-xl border border-[#24201d]/15 bg-white px-4 py-3 fon
 export function PasswordResetRequestForm() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [pending, setPending] = useState(false)
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -17,12 +18,14 @@ export function PasswordResetRequestForm() {
     if (pending) return
     setPending(true)
     setError('')
+    setFieldErrors({})
     try {
       const form = new FormData(event.currentTarget)
       const result = await requestPasswordReset(String(form.get('email') ?? '').trim())
       setMessage(result.detail)
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Password reset is temporarily unavailable.')
+      if (caught instanceof ApiError) setFieldErrors(caught.fieldErrors)
     } finally {
       setPending(false)
     }
@@ -30,7 +33,8 @@ export function PasswordResetRequestForm() {
 
   return <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
     <label className="flex flex-col gap-2 text-sm font-semibold">Email address
-      <input name="email" type="email" required maxLength={254} autoComplete="email" className={inputClass} />
+      <input name="email" type="email" required maxLength={254} autoComplete="email" aria-invalid={Boolean(fieldErrors.email)} className={inputClass} />
+      {fieldErrors.email?.map((message) => <span key={message} className="text-xs font-normal text-[#a43a52]">{message}</span>)}
     </label>
     {error && <p role="alert" className="rounded-xl bg-[#d66a83]/10 px-4 py-3 text-sm text-[#a43a52]">{error}</p>}
     {message && <p role="status" className="rounded-xl bg-[#667a52]/10 px-4 py-3 text-sm text-[#43583a]">{message}</p>}
@@ -45,6 +49,7 @@ export function PasswordResetConfirmForm() {
   const uid = params.get('uid') ?? ''
   const token = params.get('token') ?? ''
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [success, setSuccess] = useState(false)
   const [pending, setPending] = useState(false)
 
@@ -59,12 +64,14 @@ export function PasswordResetConfirmForm() {
     }
     setPending(true)
     setError('')
+    setFieldErrors({})
     try {
       await confirmPasswordReset({ uid, token, password })
       setSuccess(true)
       router.replace('/login?passwordReset=1')
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Password reset is temporarily unavailable.')
+      if (caught instanceof ApiError) setFieldErrors(caught.fieldErrors)
     } finally {
       setPending(false)
     }
@@ -75,7 +82,8 @@ export function PasswordResetConfirmForm() {
 
   return <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
     <label className="flex flex-col gap-2 text-sm font-semibold">New password
-      <input name="password" type="password" required minLength={8} maxLength={256} autoComplete="new-password" className={inputClass} />
+      <input name="password" type="password" required minLength={8} maxLength={256} autoComplete="new-password" aria-invalid={Boolean(fieldErrors.password)} className={inputClass} />
+      {fieldErrors.password?.map((message) => <span key={message} className="text-xs font-normal text-[#a43a52]">{message}</span>)}
     </label>
     <label className="flex flex-col gap-2 text-sm font-semibold">Confirm new password
       <input name="confirmPassword" type="password" required minLength={8} maxLength={256} autoComplete="new-password" className={inputClass} />

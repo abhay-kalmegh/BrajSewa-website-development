@@ -16,6 +16,18 @@ const nextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: buildSecurityHeaders() }]
   },
+  async rewrites() {
+    // Fallback rewrites run after app route handlers, preserving the JWT/session BFF routes under /api.
+    const backendBaseUrl = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/+$/, '')
+    if (!backendBaseUrl) return { fallback: [] }
+
+    return {
+      fallback: [{
+        source: '/api/:path*',
+        destination: `${backendBaseUrl}/api/:path*/`,
+      }],
+    }
+  },
   images: {
     // Next's optimizer resizes and converts to AVIF/WebP per device. Remote hosts must be allow-listed.
     formats: ['image/avif', 'image/webp'],

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ApiError, login, register } from '@/lib/api/client'
+import { ApiError, register } from '@/lib/api/client'
 import { useAuth } from '@/lib/auth'
 import { safeNext } from '@/lib/safe-redirect'
 
@@ -13,7 +13,7 @@ const destinationAfterAuth = () => safeNext(new URLSearchParams(window.location.
 
 export function AuthForm({ register: isRegister = false }: { register?: boolean }) {
   const router = useRouter()
-  const { refresh } = useAuth()
+  const { login: signIn } = useAuth()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
@@ -39,9 +39,8 @@ export function AuthForm({ register: isRegister = false }: { register?: boolean 
         router.refresh()
         return
       }
-      await login({ email: value('email'), password: String(form.get('password') ?? '') })
       // Load the new session first: that is what makes the header update and triggers the cart merge.
-      await refresh()
+      await signIn({ email: value('email'), password: String(form.get('password') ?? '') })
       router.push(destinationAfterAuth())
       router.refresh()
     } catch (caught) {
@@ -55,32 +54,35 @@ export function AuthForm({ register: isRegister = false }: { register?: boolean 
     }
   }
 
-  const fieldError = (name: string) => fieldErrors[name]?.[0]
+  const fieldError = (name: string) => fieldErrors[name]?.[0] ?? fieldErrors[name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)]?.[0]
 
   return (
     <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
       {isRegister && (
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm font-semibold">First name
-            <input name="firstName" required autoComplete="given-name" className={inputClass} />
+            <input name="firstName" required autoComplete="given-name" aria-invalid={Boolean(fieldError('firstName'))} className={inputClass} />
+            {fieldError('firstName') && <span className="text-xs font-normal text-[#d66a83]">{fieldError('firstName')}</span>}
           </label>
           <label className="flex flex-col gap-2 text-sm font-semibold">Last name
-            <input name="lastName" autoComplete="family-name" className={inputClass} />
+            <input name="lastName" autoComplete="family-name" aria-invalid={Boolean(fieldError('lastName'))} className={inputClass} />
+            {fieldError('lastName') && <span className="text-xs font-normal text-[#d66a83]">{fieldError('lastName')}</span>}
           </label>
         </div>
       )}
       <label className="flex flex-col gap-2 text-sm font-semibold">Email
-        <input name="email" type="email" required autoComplete="email" className={inputClass} />
+        <input name="email" type="email" required autoComplete="email" aria-invalid={Boolean(fieldError('email'))} className={inputClass} />
         {fieldError('email') && <span className="text-xs font-normal text-[#d66a83]">{fieldError('email')}</span>}
       </label>
       {isRegister && (
         <label className="flex flex-col gap-2 text-sm font-semibold">Mobile number
-          <input name="phone" type="tel" autoComplete="tel" className={inputClass} />
+          <input name="phone" type="tel" autoComplete="tel" aria-invalid={Boolean(fieldError('phone'))} className={inputClass} />
+          {fieldError('phone') && <span className="text-xs font-normal text-[#d66a83]">{fieldError('phone')}</span>}
         </label>
       )}
       <label className="flex flex-col gap-2 text-sm font-semibold">Password
         <input name="password" type="password" required minLength={isRegister ? 8 : undefined}
-          autoComplete={isRegister ? 'new-password' : 'current-password'} className={inputClass} />
+          autoComplete={isRegister ? 'new-password' : 'current-password'} aria-invalid={Boolean(fieldError('password'))} className={inputClass} />
         {fieldErrors.password?.map((message) => (
           <span key={message} className="text-xs font-normal text-[#d66a83]">{message}</span>
         ))}
