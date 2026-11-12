@@ -1,0 +1,86 @@
+name: Temporary Django Superuser Setup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create-superuser:
+    name: Create production Django superuser
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DJANGO_SECRET_KEY: ${{ secrets.BRAJSEWA_DJANGO_SECRET_KEY }}
+      JWT_SIGNING_KEY: ${{ secrets.BRAJSEWA_JWT_SIGNING_KEY }}
+      DJANGO_DEBUG: "false"
+      DJANGO_HTTPS_ONLY: "true"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      POSTGRES_SSLMODE: "require"
+      # Razorpay is not needed for this one-time management task.
+      RAZORPAY_KEY_ID: ""
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Read Render PostgreSQL connection securely
+        env:
+          BRAJSEWA_DATABASE_URL: ${{ secrets.BRAJSEWA_DATABASE_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          import secrets
+          from urllib.parse import unquote, urlparse
+
+          raw_url = os.environ.get("BRAJSEWA_DATABASE_URL", "")
+          parsed = urlparse(raw_url)
+
+          if parsed.scheme not in ("postgres", "postgresql") or not parsed.hostname:
+              raise SystemExit("BRAJSEWA_DATABASE_URL is missing or is not a valid PostgreSQL URL.")
+
+          values = {
+              "POSTGRES_DB": unquote(parsed.path.lstrip("/")),
+              "POSTGRES_USER": unquote(parsed.username or ""),
+              "POSTGRES_PASSWORD": unquote(parsed.password or ""),
+              "POSTGRES_HOST": parsed.hostname,
+              "POSTGRES_PORT": str(parsed.port or 5432),
+              "POSTGRES_SSLMODE": "require",
+          }
+
+          if not all(values[key] for key in ("POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_HOST")):
+              raise SystemExit("The PostgreSQL URL is missing a required connection field.")
+
+          env_file = os.environ["GITHUB_ENV"]
+          delimiter = "GH" + secrets.token_hex(16)
+          with open(env_file, "a", encoding="utf-8") as output:
+              for key, value in values.items():
+                  if delimiter in value:
+                      raise SystemExit("Invalid delimiter in PostgreSQL connection value.")
+                  output.write(f"{key}<<{delimiter}\n{value}\n{delimiter}\n")
+          print("Render PostgreSQL connection variables are configured (values hidden).")
+          PY
+
+      - name: Check production database migrations
+        run: python manage.py migrate --check
+
+      - name: Create Django superuser
+        env:
+          DJANGO_SUPERUSER_USERNAME: ${{ secrets.BRAJSEWA_ADMIN_USERNAME }}
+          DJANGO_SUPERUSER_EMAIL: ${{ secrets.BRAJSEWA_ADMIN_EMAIL }}
+          DJANGO_SUPERUSER_PASSWORD: ${{ secrets.BRAJSEWA_ADMIN_PASSWORD }}
+        run: python manage.py createsuperuser --noinput
