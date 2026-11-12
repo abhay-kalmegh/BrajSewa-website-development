@@ -35,6 +35,9 @@ export async function POST(req: Request) {
 
   if (upstream.status === 429) return jsonError('Too many attempts. Please wait a minute and try again.', 429)
   if (upstream.status === 409) return jsonError('An account with this email already exists.', 409)
+  if (upstream.status === 503) {
+    return jsonError('We could not send a verification email. Please try again later.', 503)
+  }
   if (upstream.status === 400) {
     const errors = await upstream.json().catch(() => ({}))
     return jsonError('Please check the highlighted details.', 400, { errors })

@@ -63,7 +63,10 @@ class SerializerTests(ShopTestCase):
 
 
 class AuthTests(ShopTestCase):
-    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        PUBLIC_SITE_URL='https://store.example.test/',
+    )
     def test_register_normalises_email_and_rejects_duplicates_case_insensitively(self):
         payload = {'email': 'New@Example.com', 'password': PASSWORD, 'firstName': 'N'}
         response = self.client.post('/api/v1/auth/register/', payload, format='json')
@@ -72,9 +75,22 @@ class AuthTests(ShopTestCase):
         user = get_user_model().objects.get(email='new@example.com')
         self.assertFalse(user.is_active)
         self.assertEqual(mail.outbox[0].to, ['new@example.com'])
-        self.assertIn('/verify-email?uid=', mail.outbox[0].body)
+        self.assertIn('https://store.example.test/verify-email?uid=', mail.outbox[0].body)
         again = self.client.post('/api/v1/auth/register/', {**payload, 'email': 'NEW@example.com'}, format='json')
         self.assertEqual(again.status_code, 409)
+
+    def test_registration_reports_verification_email_delivery_failure(self):
+        with patch('shop.views.send_mail', side_effect=OSError('SMTP unavailable')):
+            response = self.client.post(
+                '/api/v1/auth/register/',
+                {'email': 'new@example.com', 'password': PASSWORD, 'firstName': 'N'},
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn('could not send a verification email', response.data['detail'])
+        user = get_user_model().objects.get(email='new@example.com')
+        self.assertFalse(user.is_active)
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
     def test_email_verification_is_required_and_link_is_single_use(self):
