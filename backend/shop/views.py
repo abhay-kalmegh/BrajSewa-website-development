@@ -140,7 +140,9 @@ def send_verification_email(user):
             fail_silently=False,
         )
     except Exception:
-        logger.warning('Email verification delivery failed')
+        logger.exception('Email verification delivery failed')
+        return False
+    return True
 
 
 class RegisterView(APIView):
@@ -166,7 +168,11 @@ class RegisterView(APIView):
                     BuyerProfile.objects.create(user=user, phone=data.get('phone', ''))
         except IntegrityError:
             return Response({'detail': 'An account with this email already exists.'}, status=status.HTTP_409_CONFLICT)
-        send_verification_email(user)
+        if not send_verification_email(user):
+            return Response(
+                {'detail': 'We could not send a verification email. Please try again later.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         return Response({'detail': 'Check your email for a verification link to activate your account.'},
                         status=status.HTTP_201_CREATED)
 
