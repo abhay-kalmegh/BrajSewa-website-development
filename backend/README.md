@@ -28,3 +28,16 @@ Tests: `DJANGO_HTTPS_ONLY=false python manage.py test` (needs Postgres, same env
 * **Auth tokens.** Access tokens last 15 minutes, refresh tokens 7 days. The Next.js app keeps them in
   httpOnly cookies and never exposes them to browser JavaScript. Logout blacklists the refresh token.
 * Secrets (`RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `DJANGO_SECRET_KEY`) stay on the server.
+
+
+## Transactional email (Resend)
+
+For Render and other hosts that restrict outbound SMTP, use Resend's HTTPS API instead of Gmail SMTP.
+
+1. Create an API key in Resend and add it to the backend host as `RESEND_API_KEY`. Never add the key to source control or a `NEXT_PUBLIC_*` frontend variable.
+2. Set `EMAIL_BACKEND=shop.email_backend.ResendEmailBackend` (or leave it unset: production automatically selects Resend when `RESEND_API_KEY` is present).
+3. For initial testing only, set `DEFAULT_FROM_EMAIL=BrajSewa <onboarding@resend.dev>`. Resend's testing sender can only deliver to the email address associated with your Resend account. Verify a domain in Resend before sending to arbitrary customer addresses.
+4. Set `PUBLIC_SITE_URL` to the public frontend origin so verification and password-reset links point to the deployed app.
+5. Redeploy the backend after changing environment variables.
+
+The Resend backend uses HTTPS to `api.resend.com`, supports plain-text and HTML bodies, and raises delivery errors when Resend rejects or cannot accept a message. Email verification registration returns 503 when delivery fails. Verification resend remains non-enumerating and returns the same response for known and unknown addresses. Password-reset requests also remain non-enumerating.
