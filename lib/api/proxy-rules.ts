@@ -2,12 +2,14 @@
  * What the browser may reach through /api/proxy/*, and how large a request body may be. Kept free of Next.js imports so it
  * can be tested directly.
  */
-export type ProxyRule = { prefix: string; methods: string[]; public?: boolean }
+export type ProxyRule = { prefix: string; methods: string[]; public?: boolean; exact?: boolean }
 
-// First match wins, so the specific cart routes come before the generic one.
+// First match wins, so public exceptions come before the generic authenticated route rules.
 // Only endpoints the storefront actually uses are listed: adding a Django endpoint never exposes it to the browser by accident.
 export const ALLOWED: ProxyRule[] = [
+  { prefix: 'products/', methods: ['GET'], public: true, exact: true },
   { prefix: 'cart/quote/', methods: ['POST'], public: true }, // live prices for guests and customers
+  { prefix: 'orders/track/', methods: ['GET'], public: true, exact: true }, // Django verifies the order and matching contact
   { prefix: 'cart/merge/', methods: ['POST'] },
   { prefix: 'cart/', methods: ['GET', 'PUT'] }, // the signed-in customer's saved cart
   { prefix: 'orders/', methods: ['GET', 'POST'] }, // order history, create order, order detail
@@ -25,7 +27,8 @@ const SEGMENT = /^[A-Za-z0-9_-]+$/ // rejects '..', '.', encoded slashes, empty 
 export function matchRule(path: string[], method: string): { rule: ProxyRule; target: string } | null {
   if (!path.length || !path.every((segment) => SEGMENT.test(segment))) return null
   const target = `${path.join('/')}/`
-  const rule = ALLOWED.find((entry) => target.startsWith(entry.prefix))
+  if (ALLOWED.some((entry) => entry.exact && target.startsWith(entry.prefix) && target !== entry.prefix)) return null
+  const rule = ALLOWED.find((entry) => entry.exact ? target === entry.prefix : target.startsWith(entry.prefix))
   return rule && rule.methods.includes(method) ? { rule, target } : null
 }
 

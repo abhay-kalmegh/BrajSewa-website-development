@@ -13,8 +13,8 @@ import { clientIp } from '@/lib/api/client-ip'
 import { resolveSecureCookies } from '@/lib/api/cookie-policy'
 import { requestIdFor } from '@/lib/api/request-id'
 import { refreshMaxAgeSeconds } from '@/lib/api/session-lifetime'
-
-const API = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
+import { backendUrl, djangoApiUrl } from '@/lib/api/config'
+import { fetchWithTimeoutAndRetry } from '@/lib/api/transport'
 
 export const ACCESS_COOKIE = 'bs_access'
 export const REFRESH_COOKIE = 'bs_refresh'
@@ -79,7 +79,7 @@ export function guardMutation(req: Request, options: { requireJson?: boolean } =
 
 // ---- Django calls -------------------------------------------------------------------------------
 
-type DjangoInit = { method?: string; body?: string; headers?: Record<string, string>; req?: Request }
+type DjangoInit = { method?: string; body?: string; headers?: Record<string, string>; signal?: AbortSignal; req?: Request }
 
 // How many proxies YOU operate between the internet and this server (CloudFront + ALB = 2, ALB only = 1, none = 0).
 const TRUSTED_PROXY_HOPS = Number(process.env.TRUSTED_PROXY_HOPS ?? '1')
@@ -100,14 +100,24 @@ function forwardedHeaders(req?: Request): Record<string, string> {
   return headers
 }
 
-export async function djangoFetch(path: string, init: DjangoInit = {}) {
-  if (!API) throw new Error('NEXT_PUBLIC_API_URL is not configured')
-  const { req, headers, ...rest } = init
-  return fetch(`${API}/api/v1${path}`, {
+async function requestBackend(url: string, init: DjangoInit = {}) {
+  const { req, headers, signal = req?.signal, ...rest } = init
+  return fetchWithTimeoutAndRetry(url, {
     ...rest,
+    signal,
     cache: 'no-store',
     headers: { 'Content-Type': 'application/json', ...forwardedHeaders(req), ...headers },
   })
+}
+
+/** Call an existing Django root-level endpoint such as /healthz/ or /readyz/. */
+export function backendFetch(path: string, init: DjangoInit = {}) {
+  return requestBackend(backendUrl(path), init)
+}
+
+/** Call an existing Django REST endpoint under /api/v1. */
+export function djangoFetch(path: string, init: DjangoInit = {}) {
+  return requestBackend(djangoApiUrl(path), init)
 }
 
 /** Exchange the refresh cookie for a new access token. Returns null if the user is signed out. */

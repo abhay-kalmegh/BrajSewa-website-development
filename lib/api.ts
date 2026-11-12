@@ -1,7 +1,7 @@
+import { fetchWithTimeoutAndRetry as fetchWithTransport } from '@/lib/api/transport'
+
 export const API_REQUEST_STATUS_EVENT = 'brajsewa:api-request-status'
 
-const REQUEST_TIMEOUT_MS = 60_000
-const SLOW_REQUEST_MS = 5_000
 let activeSlowRequests = 0
 
 export class ApiError extends Error {
@@ -60,42 +60,17 @@ function dispatchSlowRequestCount() {
   }
 }
 
-async function fetchWithTimeoutAndRetry(input: string, init: RequestInit) {
-  let lastError: unknown
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const controller = new AbortController()
-    const externalSignal = init.signal
-    const forwardAbort = () => controller.abort(externalSignal?.reason)
-    if (externalSignal?.aborted) forwardAbort()
-    else externalSignal?.addEventListener('abort', forwardAbort, { once: true })
-
-    let wasSlow = false
-    const slowTimer = setTimeout(() => {
-      wasSlow = true
+const fetchWithTimeoutAndRetry = (input: string, init: RequestInit) =>
+  fetchWithTransport(input, init, {
+    onSlowStart: () => {
       activeSlowRequests += 1
       dispatchSlowRequestCount()
-    }, SLOW_REQUEST_MS)
-    const timeout = setTimeout(() => controller.abort(new DOMException('Request timed out after 60 seconds.', 'TimeoutError')), REQUEST_TIMEOUT_MS)
-
-    try {
-      return await fetch(input, { ...init, signal: controller.signal })
-    } catch (error) {
-      lastError = error
-      if (externalSignal?.aborted || attempt === 1) throw error
-    } finally {
-      clearTimeout(slowTimer)
-      clearTimeout(timeout)
-      externalSignal?.removeEventListener('abort', forwardAbort)
-      if (wasSlow) {
-        activeSlowRequests = Math.max(0, activeSlowRequests - 1)
-        dispatchSlowRequestCount()
-      }
-    }
-  }
-
-  throw lastError
-}
+    },
+    onSlowEnd: () => {
+      activeSlowRequests = Math.max(0, activeSlowRequests - 1)
+      dispatchSlowRequestCount()
+    },
+  })
 
 // Forward a CSRF cookie if the backend has set one. No CSRF bootstrap URL is registered; the JWT BFF's same-origin
 // guard and SameSite cookies remain the mutation defense, so the client does not invent a backend endpoint.
@@ -110,7 +85,7 @@ function readCsrfCookie() {
   }
 }
 
-/** Browser requests stay on this origin; Next routes and the /api rewrite handle the backend hop. */
+/** Browser requests stay on this origin; allowlisted Next.js routes handle the backend hop. */
 export async function api<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   if (!path.startsWith('/') || path.startsWith('//')) {
     throw new TypeError('API paths must be relative to this application origin.')

@@ -9,14 +9,17 @@ const post = (body: BodyInit | null, headers: Record<string, string> = {}) => ne
 async function main() {
   // ---- routing -----------------------------------------------------------------------------------------------
   await t('every storefront route is reachable with the right method', () => {
-    for (const [path, method] of [['cart/quote', 'POST'], ['cart/merge', 'POST'], ['cart', 'GET'], ['cart', 'PUT'], ['orders', 'GET'], ['orders', 'POST'],
-      ['orders/12', 'GET'], ['payments/razorpay/verify', 'POST'], ['account/me', 'GET'],
+    for (const [path, method] of [['products', 'GET'], ['cart/quote', 'POST'], ['cart/merge', 'POST'], ['cart', 'GET'], ['cart', 'PUT'], ['orders', 'GET'], ['orders', 'POST'],
+      ['orders/track', 'GET'], ['orders/12', 'GET'], ['payments/razorpay/verify', 'POST'], ['account/me', 'GET'],
       ['seller/notifications/preferences', 'GET'], ['seller/notifications/preferences', 'PATCH'], ['seller/notifications', 'GET']] as const)
       assert.ok(matchRule(path.split('/'), method), `${method} ${path}`)
   })
-  await t('only the quote route is usable without a session', () => {
-    assert.equal(matchRule(['cart', 'quote'], 'POST')?.rule.public, true)
-    for (const p of [['cart'], ['cart', 'merge'], ['orders'], ['account', 'me']]) assert.notEqual(matchRule(p, p[0] === 'cart' && p.length === 1 ? 'GET' : p[1] === 'merge' ? 'POST' : 'GET')?.rule.public, true, p.join('/'))
+  await t('only verified catalog, cart-quote, and order-tracking routes are public', () => {
+    const publicRoutes: Array<[string[], string]> = [[['products'], 'GET'], [['cart', 'quote'], 'POST'], [['orders', 'track'], 'GET']]
+    for (const [path, method] of publicRoutes)
+      assert.equal(matchRule(path, method)?.rule.public, true, `${method} ${path.join('/')}`)
+    for (const p of [['cart'], ['cart', 'merge'], ['orders'], ['account', 'me']])
+      assert.notEqual(matchRule(p, p[0] === 'cart' && p.length === 1 ? 'GET' : p[1] === 'merge' ? 'POST' : 'GET')?.rule.public, true, p.join('/'))
   })
   await t('seller operations expose only authenticated product and order methods', () => {
     for (const m of ['GET', 'POST', 'PATCH', 'PUT']) assert.ok(matchRule(['seller', 'products'], m), m)
@@ -28,12 +31,13 @@ async function main() {
     assert.equal(matchRule(['seller', 'notifications'], 'POST'), null)
     assert.equal(matchRule(['seller', 'products'], 'DELETE'), null)
   })
-  await t('wrong methods are refused', () => {
+  await t('wrong methods and nested public paths are refused', () => {
     assert.equal(matchRule(['cart', 'quote'], 'GET'), null); assert.equal(matchRule(['orders'], 'DELETE'), null)
     assert.equal(matchRule(['account', 'me'], 'POST'), null); assert.equal(matchRule(['payments', 'razorpay', 'verify'], 'GET'), null)
+    assert.equal(matchRule(['products', 'seva-box'], 'GET'), null); assert.equal(matchRule(['orders', 'track', 'extra'], 'GET'), null)
   })
   await t('unknown paths are refused, including Django routes never meant for the browser', () => {
-    for (const p of [['admin'], ['auth', 'token'], ['payments', 'razorpay', 'webhook'], ['products'], ['seller']]) assert.equal(matchRule(p, 'GET'), null, p.join('/'))
+    for (const p of [['admin'], ['auth', 'token'], ['payments', 'razorpay', 'webhook'], ['seller']]) assert.equal(matchRule(p, 'GET'), null, p.join('/'))
   })
   await t('traversal and odd segments are refused', () => {
     for (const p of [['..', 'admin'], ['.', 'orders'], ['orders', '..', 'admin'], [''], [], ['orders', '%2e%2e'], ['orders', 'a/b'], ['or ders'], ['orders', '1;2'], ['orders\n'], ['ords', '\u0661']])
