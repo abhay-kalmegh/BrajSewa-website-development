@@ -22,4 +22,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
 # `exec` makes gunicorn PID 1 so it receives SIGTERM and drains in-flight requests (--graceful-timeout) on deploy.
 # --keep-alive must exceed the load balancer's idle timeout (ALB default 60 s) or the balancer reuses a connection
 # the app already closed and users see sporadic 502s.
-CMD ["sh", "-c", "exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --worker-class gthread --workers ${GUNICORN_WORKERS:-2} --threads ${GUNICORN_THREADS:-4} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout 30 --keep-alive 75 --access-logfile -"]
+# CMD ["sh", "-c", "exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --worker-class gthread --workers ${GUNICORN_WORKERS:-2} --threads ${GUNICORN_THREADS:-4} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout 30 --keep-alive 75 --access-logfile -"]
+
+CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --worker-class gthread --workers ${GUNICORN_WORKERS:-2} --threads ${GUNICORN_THREADS:-4} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout 30 --keep-alive 75 --access-logfile -"]
