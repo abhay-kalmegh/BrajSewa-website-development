@@ -154,11 +154,12 @@ services:
         CSP_REPORT_URI: ${CSP_REPORT_URI:-}
         HSTS_MAX_AGE_SECONDS: ${HSTS_MAX_AGE_SECONDS:-3600}
         HSTS_INCLUDE_SUBDOMAINS: ${HSTS_INCLUDE_SUBDOMAINS:-false}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:8000}
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      # Server-side only. The browser never talks to Django directly.
-      API_INTERNAL_URL: http://backend:8000
+      # Next.js reaches Django server-side; browser requests stay on the frontend origin through the rewrite.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:8000}
       BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN:?Set BLOB_READ_WRITE_TOKEN}
       TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
       AUTH_REFRESH_DAYS: ${SESSION_REFRESH_DAYS:-3}      # keep equal to the backend's JWT_REFRESH_DAYS

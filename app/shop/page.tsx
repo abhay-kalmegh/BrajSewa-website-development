@@ -6,6 +6,6 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Shop · BrajSewa.com' }
 
 export default async function ShopPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
-  const [products, { category }] = await Promise.all([getProducts().catch(() => []), searchParams])
+  const [products, { category }] = await Promise.all([getProducts(), searchParams])
   return <ShopClient products={products} initialCategory={category || 'All'} />
 }

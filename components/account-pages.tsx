@@ -29,11 +29,19 @@ function useOrders(enabled: boolean) {
 
 export function AccountPages({ section }: { section: Section }) {
   const router = useRouter()
-  const { user, status, signOut } = useRequireAuth()
+  const { user, status, signOut, refresh } = useRequireAuth()
   const { orders, error, retry } = useOrders(Boolean(user) && (section === 'overview' || section === 'orders'))
 
+  if (status === 'error' && !user) {
+    return <GenericPage eyebrow="Your account" title={TITLES[section]}>
+      <div className="mt-8 rounded-2xl bg-white p-6 text-sm text-[#635951]" role="alert">
+        We couldn&apos;t check your session. The server may be waking up.
+        <button type="button" onClick={() => void refresh()} className="ml-2 font-bold text-[#667a52] underline">Try again</button>
+      </div>
+    </GenericPage>
+  }
   if (status === 'loading' || !user) {
-    return <GenericPage eyebrow="Your account" title={TITLES[section]}><p className="mt-8 text-[#24201d]/60">Loading your account…</p></GenericPage>
+    return <GenericPage eyebrow="Your account" title={TITLES[section]}><p className="mt-8 text-[#24201d]/60" role="status">Loading your account…</p></GenericPage>
   }
 
   const firstName = user.firstName || user.name.split(' ')[0]
@@ -101,7 +109,7 @@ function Tile({ href, icon, title, text }: { href: string; icon: React.ReactNode
 
 function OrderList({ orders, error, retry }: { orders: OrderView[] | null; error: boolean; retry: () => void }) {
   if (error) return <div className="mt-4 rounded-2xl bg-white p-6 text-sm">We couldn&apos;t load your orders. <button onClick={retry} className="font-bold text-[#667a52] underline">Try again</button></div>
-  if (!orders) return <p className="mt-4 text-[#24201d]/60">Loading your orders…</p>
+  if (!orders) return <div className="mt-4 grid gap-3" role="status" aria-busy="true" aria-label="Loading your orders">{[0, 1].map((item) => <div key={item} className="h-28 animate-pulse rounded-2xl bg-white" />)}</div>
   if (orders.length === 0) {
     return (
       <div className="mt-4 rounded-2xl bg-white p-10 text-center">

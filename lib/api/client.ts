@@ -3,8 +3,10 @@
  * in httpOnly cookies and call Django server-side (see lib/api/server.ts). No tokens in JavaScript.
  */
 
+import { api } from '@/lib/api'
 import type { CartQuote, OrderView, Profile } from '@/lib/types'
 
+export { ApiError } from '@/lib/api'
 export type { Profile }
 
 export type CheckoutCustomer = {
@@ -35,42 +37,7 @@ export type RazorpayPaymentResult = {
   razorpay_payment_id: string
   razorpay_signature: string
 }
-export class ApiError extends Error {
-  constructor(message: string, readonly status: number, readonly body: unknown) {
-    super(message)
-  }
-  /** Field-level messages from Django validation, e.g. { password: ['Too common.'] } */
-  get fieldErrors(): Record<string, string[]> {
-    const errors = (this.body as { errors?: unknown } | null)?.errors
-    return errors && typeof errors === 'object' ? (errors as Record<string, string[]>) : {}
-  }
-}
-
-/** First human-readable message in an API error body: `detail`, or the first field error DRF reports. */
-function messageFrom(body: unknown, fallback: string): string {
-  const find = (value: unknown, depth = 0): string | null => {
-    if (typeof value === 'string') return value
-    if (depth > 4 || value === null || typeof value !== 'object') return null
-    for (const child of Array.isArray(value) ? value : Object.values(value)) {
-      const found = find(child, depth + 1)
-      if (found) return found
-    }
-    return null
-  }
-  const detail = (body as { detail?: unknown } | null)?.detail
-  return (typeof detail === 'string' ? detail : find(body)) ?? fallback
-}
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-  })
-  const body: unknown = await response.json().catch(() => null)
-  if (!response.ok) throw new ApiError(messageFrom(body, `Request failed (${response.status})`), response.status, body)
-  return body as T
-}
+const request = api
 
 const json = (value: unknown) => JSON.stringify(value)
 

@@ -14,7 +14,7 @@ import { resolveSecureCookies } from '@/lib/api/cookie-policy'
 import { requestIdFor } from '@/lib/api/request-id'
 import { refreshMaxAgeSeconds } from '@/lib/api/session-lifetime'
 
-const API = (process.env.API_INTERNAL_URL ?? '').replace(/\/$/, '')
+const API = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
 export const ACCESS_COOKIE = 'bs_access'
 export const REFRESH_COOKIE = 'bs_refresh'
@@ -101,7 +101,7 @@ function forwardedHeaders(req?: Request): Record<string, string> {
 }
 
 export async function djangoFetch(path: string, init: DjangoInit = {}) {
-  if (!API) throw new Error('API_INTERNAL_URL is not configured')
+  if (!API) throw new Error('NEXT_PUBLIC_API_URL is not configured')
   const { req, headers, ...rest } = init
   return fetch(`${API}/api/v1${path}`, {
     ...rest,

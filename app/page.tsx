@@ -6,6 +6,6 @@ export const dynamic = 'force-dynamic'
 
 export default async function Page() {
   // The packing fee for custom seva boxes is an unlisted product, so it isn't in the public list.
-  const [products, packing] = await Promise.all([getProducts().catch(() => []), getBundlePacking().catch(() => null)])
+  const [products, packing] = await Promise.all([getProducts(), getBundlePacking()])
   return <HomeClient products={products} packing={packing} />
 }
