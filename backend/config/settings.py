@@ -204,10 +204,15 @@ LOGGING = logging_config(os.getenv('LOG_LEVEL', 'INFO'))   # JSON lines with a r
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Seller order notification delivery. Use console email in local DEBUG; configure SMTP in production.
+# Transactional email. Prefer Resend's HTTPS API on cloud hosts that restrict outbound SMTP.
+# Explicit EMAIL_BACKEND overrides auto-selection; otherwise DEBUG uses console, and a configured Resend key
+# selects the Resend backend. SMTP remains available as a compatibility fallback for self-hosted deployments.
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
 EMAIL_BACKEND = os.getenv(
     'EMAIL_BACKEND',
-    'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend',
+    'django.core.mail.backends.console.EmailBackend' if DEBUG else (
+        'shop.email_backend.ResendEmailBackend' if RESEND_API_KEY else 'django.core.mail.backends.smtp.EmailBackend'
+    ),
 )
 EMAIL_HOST = os.getenv('EMAIL_HOST', '')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
@@ -215,7 +220,7 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', True)
 EMAIL_USE_SSL = env_bool('EMAIL_USE_SSL', False)
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'BrajSewa <no-reply@brajsewa.com>')
-PUBLIC_SITE_URL = os.getenv('PUBLIC_SITE_URL', 'https://brajsewa.com').rstrip('/')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'BrajSewa <onboarding@resend.dev>' if RESEND_API_KEY else 'BrajSewa <no-reply@brajsewa.com>')
+PUBLIC_SITE_URL = os.getenv('PUBLIC_SITE_URL', 'https://brajsewa-website-development-e8uuf26f.v0.build').rstrip('/')
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
 EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))
